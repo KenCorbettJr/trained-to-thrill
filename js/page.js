@@ -1,65 +1,2371 @@
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-function showSpinner(e){refreshButton.classList.add("loading")}function hideSpinner(e){refreshButton.classList.remove("loading")}function updatePage(e){var t;photoIDsDisplayed?(t=photosEl.scrollHeight,e=e.filter(function(e){return-1==photoIDsDisplayed.indexOf(e.id)?(photoIDsDisplayed.push(e.id),!0):!1}),photosEl.insertBefore(utils.strToEls(photosTemplate(e)),photosEl.firstChild),photosEl.scrollTop+=photosEl.scrollHeight-t):(photoIDsDisplayed=e.map(function(e){return e.id}),photosEl.insertBefore(utils.strToEls(photosTemplate(e)),photosEl.firstChild))}function getTrainPhotoData(){return flickr.search(searchTerm,{headers:{}})["catch"](function(){return null})}function getCachedTrainPhotoData(){return"serviceWorker"in navigator&&navigator.serviceWorker.controller?flickr.search(searchTerm,{headers:{"x-use-cache-only":"1"}})["catch"](function(){return null}):Promise.resolve(null)}function showMessage(e,t){msgContentEl.textContent=e,msgEl.style.display="block",msgEl.offsetWidth,msgEl.classList.add("show"),setTimeout(function(){msgEl.classList.remove("show")},t)}function showConnectionError(){showMessage("Connectivity derailed!",5e3)}window.Promise=window.Promise||require("es6-promise").Promise,require("whatwg-fetch");var flickr=require("./flickr"),photosTemplate=require("./views/photos.hbs"),utils=require("./utils"),searchTerm="train station";location.port&&"80"!=location.port||"https:"==location.protocol||(location.protocol="https:");var photosEl=document.querySelector(".photos"),refreshButton=document.querySelector("button.refresh"),msgEl=document.querySelector(".msg-container"),msgContentEl=document.querySelector(".msg"),photoIDsDisplayed=null;"serviceWorker"in navigator&&(navigator.serviceWorker.register("./sw.js"),navigator.serviceWorker.controller||navigator.serviceWorker.addEventListener("controllerchange",function e(){flickr.search(searchTerm,{headers:{"x-cache-warmup":"1"}}),navigator.serviceWorker.removeEventListener("controllerchange",e)})),refreshButton.addEventListener("click",function(e){this.blur(),e.preventDefault(),showSpinner(),getTrainPhotoData().then(function(e){var t=photoIDsDisplayed&&photoIDsDisplayed.length;updatePage(e),t!=photoIDsDisplayed.length&&(photosEl.scrollTop=0)})["catch"](showConnectionError).then(hideSpinner)});var liveDataFetched=getTrainPhotoData().then(function(e){if(!e)return!1;var t=!!photoIDsDisplayed,o=photoIDsDisplayed&&photoIDsDisplayed.length;return updatePage(e),t&&o!=photoIDsDisplayed.length&&showMessage("▲ New trains ▲",3e3),!0}),cachedDataFetched=getCachedTrainPhotoData().then(function(e){return e?(photoIDsDisplayed||updatePage(e),!0):!1});liveDataFetched.then(function(e){return e||cachedDataFetched}).then(function(e){e||showConnectionError(),hideSpinner()}),document.addEventListener("load",function(e){e.target.classList.contains("main-photo-img")&&e.target.parentNode.classList.add("loaded")},!0);
-},{"./flickr":13,"./utils":14,"./views/photos.hbs":15,"es6-promise":3,"whatwg-fetch":12}],2:[function(require,module,exports){
-function drainQueue(){if(!draining){draining=!0;for(var e,o=queue.length;o;){e=queue,queue=[];for(var r=-1;++r<o;)e[r]();o=queue.length}draining=!1}}function noop(){}var process=module.exports={},queue=[],draining=!1;process.nextTick=function(e){queue.push(e),draining||setTimeout(drainQueue,0)},process.title="browser",process.browser=!0,process.env={},process.argv=[],process.version="",process.versions={},process.on=noop,process.addListener=noop,process.once=noop,process.off=noop,process.removeListener=noop,process.removeAllListeners=noop,process.emit=noop,process.binding=function(e){throw new Error("process.binding is not supported")},process.cwd=function(){return"/"},process.chdir=function(e){throw new Error("process.chdir is not supported")},process.umask=function(){return 0};
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({"./src/js/page/index.js":[function(require,module,exports){
+window.Promise = window.Promise || require('es6-promise').Promise;
+require('whatwg-fetch');
 
+var flickr = require('./flickr');
+var photosTemplate = require('./views/photos.hbs');
+var utils = require('./utils');
+var searchTerm = 'danboard danbo';
 
-},{}],3:[function(require,module,exports){
+// force https
+if ((!location.port || location.port == "80") && location.protocol != 'https:') {
+    location.protocol = 'https:';
+}
+
+var photosEl = document.querySelector('.photos');
+var refreshButton = document.querySelector('button.refresh');
+var msgEl = document.querySelector('.msg-container');
+var msgContentEl = document.querySelector('.msg');
+var photoIDsDisplayed = null;
+
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+
+    // Warm up the cache on that very first use
+    if (!navigator.serviceWorker.controller) {
+        navigator.serviceWorker.addEventListener('controllerchange', function changeListener() {
+            // New worker has claimed, warm up the caches
+            flickr.search(searchTerm, {
+                headers: {'x-cache-warmup': '1'}
+            });
+
+            // We only care about this once.
+            navigator.serviceWorker.removeEventListener('controllerchange', changeListener);
+        });
+    }
+}
+
+function showSpinner(data) {
+    refreshButton.classList.add('loading');
+}
+
+function hideSpinner(data) {
+    refreshButton.classList.remove('loading');
+}
+
+function updatePage(data) {
+    var scrollHeight;
+    
+    
+    if (photoIDsDisplayed) {
+        scrollHeight = photosEl.scrollHeight;
+
+        data = data.filter(function(photo) {
+            if (photoIDsDisplayed.indexOf(photo.id) == -1) {
+                photoIDsDisplayed.push(photo.id);
+                return true;
+            }
+            return false;
+        });
+
+        photosEl.insertBefore(utils.strToEls(photosTemplate(data)), photosEl.firstChild);
+        photosEl.scrollTop += photosEl.scrollHeight - scrollHeight;
+    }
+    else {
+        photoIDsDisplayed = data.map(function(p) { return p.id; });
+        photosEl.insertBefore(utils.strToEls(photosTemplate(data)), photosEl.firstChild);
+    }
+}
+
+function getTrainPhotoData() {
+    return flickr.search(searchTerm, {
+        headers: {}
+    }).catch(function() {
+        return null;
+    });
+}
+
+function getCachedTrainPhotoData() {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        return flickr.search(searchTerm, {
+            headers: {'x-use-cache-only': '1'}
+        }).catch(function() {
+            return null;
+        });
+    }
+    else {
+        return Promise.resolve(null);
+    }
+}
+
+function showMessage(msg, duration) {
+    msgContentEl.textContent = msg;
+    msgEl.style.display = 'block';
+    msgEl.offsetWidth;
+    msgEl.classList.add('show');
+    setTimeout(function() {
+        msgEl.classList.remove('show');
+    }, duration);
+}
+
+function showConnectionError() {
+    showMessage("No Connectivity!", 5000);
+}
+
+// Refresh button
+refreshButton.addEventListener('click', function(event) {
+    this.blur();
+    event.preventDefault();
+    showSpinner();
+    getTrainPhotoData().then(function(data) {
+        var oldLen = photoIDsDisplayed && photoIDsDisplayed.length;
+        updatePage(data);
+        if (oldLen != photoIDsDisplayed.length) {
+            photosEl.scrollTop = 0;
+        }
+    }).catch(showConnectionError).then(hideSpinner);
+});
+
+// Initial load
+
+var liveDataFetched = getTrainPhotoData().then(function(data) {
+    if (!data) return false;
+
+    var alreadyRendered = !!photoIDsDisplayed;
+    var oldLen = photoIDsDisplayed && photoIDsDisplayed.length;
+    updatePage(data);
+    if (alreadyRendered && oldLen != photoIDsDisplayed.length) {
+        showMessage("▲ New Danbo ▲", 3000);
+    }
+    return true;
+});
+
+var cachedDataFetched = getCachedTrainPhotoData().then(function(data) {
+    if (!data) return false;
+    if (!photoIDsDisplayed) {
+        updatePage(data);
+    }
+    return true;
+});
+
+liveDataFetched.then(function(fetched) {
+    return fetched || cachedDataFetched;
+}).then(function(dataFetched) {
+    if (!dataFetched) {
+        showConnectionError();
+    }
+    hideSpinner();
+});
+
+// Add classes to fade-in images
+document.addEventListener('load', function(event) {
+    if (event.target.classList.contains('main-photo-img')) {
+        event.target.parentNode.classList.add('loaded');
+    }
+}, true);
+},{"./flickr":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/src/js/page/flickr.js","./utils":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/src/js/page/utils.js","./views/photos.hbs":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/src/js/page/views/photos.hbs","es6-promise":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/es6-promise/dist/es6-promise.js","whatwg-fetch":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/whatwg-fetch/fetch.js"}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/browserify/node_modules/process/browser.js":[function(require,module,exports){
+// shim for using process in browser
+
+var process = module.exports = {};
+var queue = [];
+var draining = false;
+
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    draining = true;
+    var currentQueue;
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        var i = -1;
+        while (++i < len) {
+            currentQueue[i]();
+        }
+        len = queue.length;
+    }
+    draining = false;
+}
+process.nextTick = function (fun) {
+    queue.push(fun);
+    if (!draining) {
+        setTimeout(drainQueue, 0);
+    }
+};
+
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+};
+
+// TODO(shtylman)
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function() { return 0; };
+
+},{}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/es6-promise/dist/es6-promise.js":[function(require,module,exports){
 (function (process,global){
-(function(){"use strict";function t(t){return"function"==typeof t||"object"==typeof t&&null!==t}function e(t){return"function"==typeof t}function n(t){return"object"==typeof t&&null!==t}function r(){}function o(){return function(){process.nextTick(c)}}function i(){var t=0,e=new F(c),n=document.createTextNode("");return e.observe(n,{characterData:!0}),function(){n.data=t=++t%2}}function s(){var t=new MessageChannel;return t.port1.onmessage=c,function(){t.port2.postMessage(0)}}function u(){return function(){setTimeout(c,1)}}function c(){for(var t=0;D>t;t+=2){var e=N[t],n=N[t+1];e(n),N[t]=void 0,N[t+1]=void 0}D=0}function a(){}function f(){return new TypeError("You cannot resolve a promise with itself")}function l(){return new TypeError("A promises callback cannot return that same promise.")}function h(t){try{return t.then}catch(e){return z.error=e,z}}function p(t,e,n,r){try{t.call(e,n,r)}catch(o){return o}}function _(t,e,n){Y(function(t){var r=!1,o=p(n,e,function(n){r||(r=!0,e!==n?m(t,n):w(t,n))},function(e){r||(r=!0,g(t,e))},"Settle: "+(t._label||" unknown promise"));!r&&o&&(r=!0,g(t,o))},t)}function d(t,e){e._state===W?w(t,e._result):t._state===q?g(t,e._result):b(e,void 0,function(e){m(t,e)},function(e){g(t,e)})}function v(t,n){if(n.constructor===t.constructor)d(t,n);else{var r=h(n);r===z?g(t,z.error):void 0===r?w(t,n):e(r)?_(t,n,r):w(t,n)}}function m(e,n){e===n?g(e,f()):t(n)?v(e,n):w(e,n)}function y(t){t._onerror&&t._onerror(t._result),A(t)}function w(t,e){t._state===U&&(t._result=e,t._state=W,0===t._subscribers.length||Y(A,t))}function g(t,e){t._state===U&&(t._state=q,t._result=e,Y(y,t))}function b(t,e,n,r){var o=t._subscribers,i=o.length;t._onerror=null,o[i]=e,o[i+W]=n,o[i+q]=r,0===i&&t._state&&Y(A,t)}function A(t){var e=t._subscribers,n=t._state;if(0!==e.length){for(var r,o,i=t._result,s=0;s<e.length;s+=3)r=e[s],o=e[s+n],r?P(n,r,o,i):o(i);t._subscribers.length=0}}function j(){this.error=null}function E(t,e){try{return t(e)}catch(n){return B.error=n,B}}function P(t,n,r,o){var i,s,u,c,a=e(r);if(a){if(i=E(r,o),i===B?(c=!0,s=i.error,i=null):u=!0,n===i)return void g(n,l())}else i=o,u=!0;n._state!==U||(a&&u?m(n,i):c?g(n,s):t===W?w(n,i):t===q&&g(n,i))}function T(t,e){try{e(function(e){m(t,e)},function(e){g(t,e)})}catch(n){g(t,n)}}function S(t,e,n,r){this._instanceConstructor=t,this.promise=new t(a,r),this._abortOnReject=n,this._validateInput(e)?(this._input=e,this.length=e.length,this._remaining=e.length,this._init(),0===this.length?w(this.promise,this._result):(this.length=this.length||0,this._enumerate(),0===this._remaining&&w(this.promise,this._result))):g(this.promise,this._validationError())}function k(){throw new TypeError("You must pass a resolver function as the first argument to the promise constructor")}function M(){throw new TypeError("Failed to construct 'Promise': Please use the 'new' operator, this object constructor cannot be called as a function.")}function O(t){this._id=V++,this._state=void 0,this._result=void 0,this._subscribers=[],a!==t&&(e(t)||k(),this instanceof O||M(),T(this,t))}var C;C=Array.isArray?Array.isArray:function(t){return"[object Array]"===Object.prototype.toString.call(t)};var R,x=C,D=(Date.now||function(){return(new Date).getTime()},Object.create||function(t){if(arguments.length>1)throw new Error("Second argument not supported");if("object"!=typeof t)throw new TypeError("Argument must be an object");return r.prototype=t,new r},0),Y=function(t,e){N[D]=t,N[D+1]=e,D+=2,2===D&&R()},I="undefined"!=typeof window?window:{},F=I.MutationObserver||I.WebKitMutationObserver,K="undefined"!=typeof Uint8ClampedArray&&"undefined"!=typeof importScripts&&"undefined"!=typeof MessageChannel,N=new Array(1e3);R="undefined"!=typeof process&&"[object process]"==={}.toString.call(process)?o():F?i():K?s():u();var U=void 0,W=1,q=2,z=new j,B=new j;S.prototype._validateInput=function(t){return x(t)},S.prototype._validationError=function(){return new Error("Array Methods must be provided an Array")},S.prototype._init=function(){this._result=new Array(this.length)};var G=S;S.prototype._enumerate=function(){for(var t=this.length,e=this.promise,n=this._input,r=0;e._state===U&&t>r;r++)this._eachEntry(n[r],r)},S.prototype._eachEntry=function(t,e){var r=this._instanceConstructor;n(t)?t.constructor===r&&t._state!==U?(t._onerror=null,this._settledAt(t._state,e,t._result)):this._willSettleAt(r.resolve(t),e):(this._remaining--,this._result[e]=this._makeResult(W,e,t))},S.prototype._settledAt=function(t,e,n){var r=this.promise;r._state===U&&(this._remaining--,this._abortOnReject&&t===q?g(r,n):this._result[e]=this._makeResult(t,e,n)),0===this._remaining&&w(r,this._result)},S.prototype._makeResult=function(t,e,n){return n},S.prototype._willSettleAt=function(t,e){var n=this;b(t,void 0,function(t){n._settledAt(W,e,t)},function(t){n._settledAt(q,e,t)})};var H=function(t,e){return new G(this,t,!0,e).promise},J=function(t,e){function n(t){m(i,t)}function r(t){g(i,t)}var o=this,i=new o(a,e);if(!x(t))return g(i,new TypeError("You must pass an array to race.")),i;for(var s=t.length,u=0;i._state===U&&s>u;u++)b(o.resolve(t[u]),void 0,n,r);return i},L=function(t,e){var n=this;if(t&&"object"==typeof t&&t.constructor===n)return t;var r=new n(a,e);return m(r,t),r},Q=function(t,e){var n=this,r=new n(a,e);return g(r,t),r},V=0,X=O;O.all=H,O.race=J,O.resolve=L,O.reject=Q,O.prototype={constructor:O,then:function(t,e){var n=this,r=n._state;if(r===W&&!t||r===q&&!e)return this;var o=new this.constructor(a),i=n._result;if(r){var s=arguments[r-1];Y(function(){P(r,o,s,i)})}else b(n,o,t,e);return o},"catch":function(t){return this.then(null,t)}};var Z=function(){var t;t="undefined"!=typeof global?global:"undefined"!=typeof window&&window.document?window:self;var n="Promise"in t&&"resolve"in t.Promise&&"reject"in t.Promise&&"all"in t.Promise&&"race"in t.Promise&&function(){var n;return new t.Promise(function(t){n=t}),e(n)}();n||(t.Promise=X)},$={Promise:X,polyfill:Z};"function"==typeof define&&define.amd?define(function(){return $}):"undefined"!=typeof module&&module.exports?module.exports=$:"undefined"!=typeof this&&(this.ES6Promise=$)}).call(this);
+/*!
+ * @overview es6-promise - a tiny implementation of Promises/A+.
+ * @copyright Copyright (c) 2014 Yehuda Katz, Tom Dale, Stefan Penner and contributors (Conversion to ES6 API by Jake Archibald)
+ * @license   Licensed under MIT license
+ *            See https://raw.githubusercontent.com/jakearchibald/es6-promise/master/LICENSE
+ * @version   2.1.0
+ */
+
+(function() {
+    "use strict";
+    function lib$es6$promise$utils$$objectOrFunction(x) {
+      return typeof x === 'function' || (typeof x === 'object' && x !== null);
+    }
+
+    function lib$es6$promise$utils$$isFunction(x) {
+      return typeof x === 'function';
+    }
+
+    function lib$es6$promise$utils$$isMaybeThenable(x) {
+      return typeof x === 'object' && x !== null;
+    }
+
+    var lib$es6$promise$utils$$_isArray;
+    if (!Array.isArray) {
+      lib$es6$promise$utils$$_isArray = function (x) {
+        return Object.prototype.toString.call(x) === '[object Array]';
+      };
+    } else {
+      lib$es6$promise$utils$$_isArray = Array.isArray;
+    }
+
+    var lib$es6$promise$utils$$isArray = lib$es6$promise$utils$$_isArray;
+    var lib$es6$promise$asap$$len = 0;
+    var lib$es6$promise$asap$$toString = {}.toString;
+    var lib$es6$promise$asap$$vertxNext;
+    function lib$es6$promise$asap$$asap(callback, arg) {
+      lib$es6$promise$asap$$queue[lib$es6$promise$asap$$len] = callback;
+      lib$es6$promise$asap$$queue[lib$es6$promise$asap$$len + 1] = arg;
+      lib$es6$promise$asap$$len += 2;
+      if (lib$es6$promise$asap$$len === 2) {
+        // If len is 2, that means that we need to schedule an async flush.
+        // If additional callbacks are queued before the queue is flushed, they
+        // will be processed by this flush that we are scheduling.
+        lib$es6$promise$asap$$scheduleFlush();
+      }
+    }
+
+    var lib$es6$promise$asap$$default = lib$es6$promise$asap$$asap;
+
+    var lib$es6$promise$asap$$browserWindow = (typeof window !== 'undefined') ? window : undefined;
+    var lib$es6$promise$asap$$browserGlobal = lib$es6$promise$asap$$browserWindow || {};
+    var lib$es6$promise$asap$$BrowserMutationObserver = lib$es6$promise$asap$$browserGlobal.MutationObserver || lib$es6$promise$asap$$browserGlobal.WebKitMutationObserver;
+    var lib$es6$promise$asap$$isNode = typeof process !== 'undefined' && {}.toString.call(process) === '[object process]';
+
+    // test for web worker but not in IE10
+    var lib$es6$promise$asap$$isWorker = typeof Uint8ClampedArray !== 'undefined' &&
+      typeof importScripts !== 'undefined' &&
+      typeof MessageChannel !== 'undefined';
+
+    // node
+    function lib$es6$promise$asap$$useNextTick() {
+      var nextTick = process.nextTick;
+      // node version 0.10.x displays a deprecation warning when nextTick is used recursively
+      // setImmediate should be used instead instead
+      var version = process.versions.node.match(/^(?:(\d+)\.)?(?:(\d+)\.)?(\*|\d+)$/);
+      if (Array.isArray(version) && version[1] === '0' && version[2] === '10') {
+        nextTick = setImmediate;
+      }
+      return function() {
+        nextTick(lib$es6$promise$asap$$flush);
+      };
+    }
+
+    // vertx
+    function lib$es6$promise$asap$$useVertxTimer() {
+      return function() {
+        lib$es6$promise$asap$$vertxNext(lib$es6$promise$asap$$flush);
+      };
+    }
+
+    function lib$es6$promise$asap$$useMutationObserver() {
+      var iterations = 0;
+      var observer = new lib$es6$promise$asap$$BrowserMutationObserver(lib$es6$promise$asap$$flush);
+      var node = document.createTextNode('');
+      observer.observe(node, { characterData: true });
+
+      return function() {
+        node.data = (iterations = ++iterations % 2);
+      };
+    }
+
+    // web worker
+    function lib$es6$promise$asap$$useMessageChannel() {
+      var channel = new MessageChannel();
+      channel.port1.onmessage = lib$es6$promise$asap$$flush;
+      return function () {
+        channel.port2.postMessage(0);
+      };
+    }
+
+    function lib$es6$promise$asap$$useSetTimeout() {
+      return function() {
+        setTimeout(lib$es6$promise$asap$$flush, 1);
+      };
+    }
+
+    var lib$es6$promise$asap$$queue = new Array(1000);
+    function lib$es6$promise$asap$$flush() {
+      for (var i = 0; i < lib$es6$promise$asap$$len; i+=2) {
+        var callback = lib$es6$promise$asap$$queue[i];
+        var arg = lib$es6$promise$asap$$queue[i+1];
+
+        callback(arg);
+
+        lib$es6$promise$asap$$queue[i] = undefined;
+        lib$es6$promise$asap$$queue[i+1] = undefined;
+      }
+
+      lib$es6$promise$asap$$len = 0;
+    }
+
+    function lib$es6$promise$asap$$attemptVertex() {
+      try {
+        var r = require;
+        var vertx = r('vertx');
+        lib$es6$promise$asap$$vertxNext = vertx.runOnLoop || vertx.runOnContext;
+        return lib$es6$promise$asap$$useVertxTimer();
+      } catch(e) {
+        return lib$es6$promise$asap$$useSetTimeout();
+      }
+    }
+
+    var lib$es6$promise$asap$$scheduleFlush;
+    // Decide what async method to use to triggering processing of queued callbacks:
+    if (lib$es6$promise$asap$$isNode) {
+      lib$es6$promise$asap$$scheduleFlush = lib$es6$promise$asap$$useNextTick();
+    } else if (lib$es6$promise$asap$$BrowserMutationObserver) {
+      lib$es6$promise$asap$$scheduleFlush = lib$es6$promise$asap$$useMutationObserver();
+    } else if (lib$es6$promise$asap$$isWorker) {
+      lib$es6$promise$asap$$scheduleFlush = lib$es6$promise$asap$$useMessageChannel();
+    } else if (lib$es6$promise$asap$$browserWindow === undefined && typeof require === 'function') {
+      lib$es6$promise$asap$$scheduleFlush = lib$es6$promise$asap$$attemptVertex();
+    } else {
+      lib$es6$promise$asap$$scheduleFlush = lib$es6$promise$asap$$useSetTimeout();
+    }
+
+    function lib$es6$promise$$internal$$noop() {}
+
+    var lib$es6$promise$$internal$$PENDING   = void 0;
+    var lib$es6$promise$$internal$$FULFILLED = 1;
+    var lib$es6$promise$$internal$$REJECTED  = 2;
+
+    var lib$es6$promise$$internal$$GET_THEN_ERROR = new lib$es6$promise$$internal$$ErrorObject();
+
+    function lib$es6$promise$$internal$$selfFullfillment() {
+      return new TypeError("You cannot resolve a promise with itself");
+    }
+
+    function lib$es6$promise$$internal$$cannotReturnOwn() {
+      return new TypeError('A promises callback cannot return that same promise.');
+    }
+
+    function lib$es6$promise$$internal$$getThen(promise) {
+      try {
+        return promise.then;
+      } catch(error) {
+        lib$es6$promise$$internal$$GET_THEN_ERROR.error = error;
+        return lib$es6$promise$$internal$$GET_THEN_ERROR;
+      }
+    }
+
+    function lib$es6$promise$$internal$$tryThen(then, value, fulfillmentHandler, rejectionHandler) {
+      try {
+        then.call(value, fulfillmentHandler, rejectionHandler);
+      } catch(e) {
+        return e;
+      }
+    }
+
+    function lib$es6$promise$$internal$$handleForeignThenable(promise, thenable, then) {
+       lib$es6$promise$asap$$default(function(promise) {
+        var sealed = false;
+        var error = lib$es6$promise$$internal$$tryThen(then, thenable, function(value) {
+          if (sealed) { return; }
+          sealed = true;
+          if (thenable !== value) {
+            lib$es6$promise$$internal$$resolve(promise, value);
+          } else {
+            lib$es6$promise$$internal$$fulfill(promise, value);
+          }
+        }, function(reason) {
+          if (sealed) { return; }
+          sealed = true;
+
+          lib$es6$promise$$internal$$reject(promise, reason);
+        }, 'Settle: ' + (promise._label || ' unknown promise'));
+
+        if (!sealed && error) {
+          sealed = true;
+          lib$es6$promise$$internal$$reject(promise, error);
+        }
+      }, promise);
+    }
+
+    function lib$es6$promise$$internal$$handleOwnThenable(promise, thenable) {
+      if (thenable._state === lib$es6$promise$$internal$$FULFILLED) {
+        lib$es6$promise$$internal$$fulfill(promise, thenable._result);
+      } else if (promise._state === lib$es6$promise$$internal$$REJECTED) {
+        lib$es6$promise$$internal$$reject(promise, thenable._result);
+      } else {
+        lib$es6$promise$$internal$$subscribe(thenable, undefined, function(value) {
+          lib$es6$promise$$internal$$resolve(promise, value);
+        }, function(reason) {
+          lib$es6$promise$$internal$$reject(promise, reason);
+        });
+      }
+    }
+
+    function lib$es6$promise$$internal$$handleMaybeThenable(promise, maybeThenable) {
+      if (maybeThenable.constructor === promise.constructor) {
+        lib$es6$promise$$internal$$handleOwnThenable(promise, maybeThenable);
+      } else {
+        var then = lib$es6$promise$$internal$$getThen(maybeThenable);
+
+        if (then === lib$es6$promise$$internal$$GET_THEN_ERROR) {
+          lib$es6$promise$$internal$$reject(promise, lib$es6$promise$$internal$$GET_THEN_ERROR.error);
+        } else if (then === undefined) {
+          lib$es6$promise$$internal$$fulfill(promise, maybeThenable);
+        } else if (lib$es6$promise$utils$$isFunction(then)) {
+          lib$es6$promise$$internal$$handleForeignThenable(promise, maybeThenable, then);
+        } else {
+          lib$es6$promise$$internal$$fulfill(promise, maybeThenable);
+        }
+      }
+    }
+
+    function lib$es6$promise$$internal$$resolve(promise, value) {
+      if (promise === value) {
+        lib$es6$promise$$internal$$reject(promise, lib$es6$promise$$internal$$selfFullfillment());
+      } else if (lib$es6$promise$utils$$objectOrFunction(value)) {
+        lib$es6$promise$$internal$$handleMaybeThenable(promise, value);
+      } else {
+        lib$es6$promise$$internal$$fulfill(promise, value);
+      }
+    }
+
+    function lib$es6$promise$$internal$$publishRejection(promise) {
+      if (promise._onerror) {
+        promise._onerror(promise._result);
+      }
+
+      lib$es6$promise$$internal$$publish(promise);
+    }
+
+    function lib$es6$promise$$internal$$fulfill(promise, value) {
+      if (promise._state !== lib$es6$promise$$internal$$PENDING) { return; }
+
+      promise._result = value;
+      promise._state = lib$es6$promise$$internal$$FULFILLED;
+
+      if (promise._subscribers.length !== 0) {
+        lib$es6$promise$asap$$default(lib$es6$promise$$internal$$publish, promise);
+      }
+    }
+
+    function lib$es6$promise$$internal$$reject(promise, reason) {
+      if (promise._state !== lib$es6$promise$$internal$$PENDING) { return; }
+      promise._state = lib$es6$promise$$internal$$REJECTED;
+      promise._result = reason;
+
+      lib$es6$promise$asap$$default(lib$es6$promise$$internal$$publishRejection, promise);
+    }
+
+    function lib$es6$promise$$internal$$subscribe(parent, child, onFulfillment, onRejection) {
+      var subscribers = parent._subscribers;
+      var length = subscribers.length;
+
+      parent._onerror = null;
+
+      subscribers[length] = child;
+      subscribers[length + lib$es6$promise$$internal$$FULFILLED] = onFulfillment;
+      subscribers[length + lib$es6$promise$$internal$$REJECTED]  = onRejection;
+
+      if (length === 0 && parent._state) {
+        lib$es6$promise$asap$$default(lib$es6$promise$$internal$$publish, parent);
+      }
+    }
+
+    function lib$es6$promise$$internal$$publish(promise) {
+      var subscribers = promise._subscribers;
+      var settled = promise._state;
+
+      if (subscribers.length === 0) { return; }
+
+      var child, callback, detail = promise._result;
+
+      for (var i = 0; i < subscribers.length; i += 3) {
+        child = subscribers[i];
+        callback = subscribers[i + settled];
+
+        if (child) {
+          lib$es6$promise$$internal$$invokeCallback(settled, child, callback, detail);
+        } else {
+          callback(detail);
+        }
+      }
+
+      promise._subscribers.length = 0;
+    }
+
+    function lib$es6$promise$$internal$$ErrorObject() {
+      this.error = null;
+    }
+
+    var lib$es6$promise$$internal$$TRY_CATCH_ERROR = new lib$es6$promise$$internal$$ErrorObject();
+
+    function lib$es6$promise$$internal$$tryCatch(callback, detail) {
+      try {
+        return callback(detail);
+      } catch(e) {
+        lib$es6$promise$$internal$$TRY_CATCH_ERROR.error = e;
+        return lib$es6$promise$$internal$$TRY_CATCH_ERROR;
+      }
+    }
+
+    function lib$es6$promise$$internal$$invokeCallback(settled, promise, callback, detail) {
+      var hasCallback = lib$es6$promise$utils$$isFunction(callback),
+          value, error, succeeded, failed;
+
+      if (hasCallback) {
+        value = lib$es6$promise$$internal$$tryCatch(callback, detail);
+
+        if (value === lib$es6$promise$$internal$$TRY_CATCH_ERROR) {
+          failed = true;
+          error = value.error;
+          value = null;
+        } else {
+          succeeded = true;
+        }
+
+        if (promise === value) {
+          lib$es6$promise$$internal$$reject(promise, lib$es6$promise$$internal$$cannotReturnOwn());
+          return;
+        }
+
+      } else {
+        value = detail;
+        succeeded = true;
+      }
+
+      if (promise._state !== lib$es6$promise$$internal$$PENDING) {
+        // noop
+      } else if (hasCallback && succeeded) {
+        lib$es6$promise$$internal$$resolve(promise, value);
+      } else if (failed) {
+        lib$es6$promise$$internal$$reject(promise, error);
+      } else if (settled === lib$es6$promise$$internal$$FULFILLED) {
+        lib$es6$promise$$internal$$fulfill(promise, value);
+      } else if (settled === lib$es6$promise$$internal$$REJECTED) {
+        lib$es6$promise$$internal$$reject(promise, value);
+      }
+    }
+
+    function lib$es6$promise$$internal$$initializePromise(promise, resolver) {
+      try {
+        resolver(function resolvePromise(value){
+          lib$es6$promise$$internal$$resolve(promise, value);
+        }, function rejectPromise(reason) {
+          lib$es6$promise$$internal$$reject(promise, reason);
+        });
+      } catch(e) {
+        lib$es6$promise$$internal$$reject(promise, e);
+      }
+    }
+
+    function lib$es6$promise$enumerator$$Enumerator(Constructor, input) {
+      var enumerator = this;
+
+      enumerator._instanceConstructor = Constructor;
+      enumerator.promise = new Constructor(lib$es6$promise$$internal$$noop);
+
+      if (enumerator._validateInput(input)) {
+        enumerator._input     = input;
+        enumerator.length     = input.length;
+        enumerator._remaining = input.length;
+
+        enumerator._init();
+
+        if (enumerator.length === 0) {
+          lib$es6$promise$$internal$$fulfill(enumerator.promise, enumerator._result);
+        } else {
+          enumerator.length = enumerator.length || 0;
+          enumerator._enumerate();
+          if (enumerator._remaining === 0) {
+            lib$es6$promise$$internal$$fulfill(enumerator.promise, enumerator._result);
+          }
+        }
+      } else {
+        lib$es6$promise$$internal$$reject(enumerator.promise, enumerator._validationError());
+      }
+    }
+
+    lib$es6$promise$enumerator$$Enumerator.prototype._validateInput = function(input) {
+      return lib$es6$promise$utils$$isArray(input);
+    };
+
+    lib$es6$promise$enumerator$$Enumerator.prototype._validationError = function() {
+      return new Error('Array Methods must be provided an Array');
+    };
+
+    lib$es6$promise$enumerator$$Enumerator.prototype._init = function() {
+      this._result = new Array(this.length);
+    };
+
+    var lib$es6$promise$enumerator$$default = lib$es6$promise$enumerator$$Enumerator;
+
+    lib$es6$promise$enumerator$$Enumerator.prototype._enumerate = function() {
+      var enumerator = this;
+
+      var length  = enumerator.length;
+      var promise = enumerator.promise;
+      var input   = enumerator._input;
+
+      for (var i = 0; promise._state === lib$es6$promise$$internal$$PENDING && i < length; i++) {
+        enumerator._eachEntry(input[i], i);
+      }
+    };
+
+    lib$es6$promise$enumerator$$Enumerator.prototype._eachEntry = function(entry, i) {
+      var enumerator = this;
+      var c = enumerator._instanceConstructor;
+
+      if (lib$es6$promise$utils$$isMaybeThenable(entry)) {
+        if (entry.constructor === c && entry._state !== lib$es6$promise$$internal$$PENDING) {
+          entry._onerror = null;
+          enumerator._settledAt(entry._state, i, entry._result);
+        } else {
+          enumerator._willSettleAt(c.resolve(entry), i);
+        }
+      } else {
+        enumerator._remaining--;
+        enumerator._result[i] = entry;
+      }
+    };
+
+    lib$es6$promise$enumerator$$Enumerator.prototype._settledAt = function(state, i, value) {
+      var enumerator = this;
+      var promise = enumerator.promise;
+
+      if (promise._state === lib$es6$promise$$internal$$PENDING) {
+        enumerator._remaining--;
+
+        if (state === lib$es6$promise$$internal$$REJECTED) {
+          lib$es6$promise$$internal$$reject(promise, value);
+        } else {
+          enumerator._result[i] = value;
+        }
+      }
+
+      if (enumerator._remaining === 0) {
+        lib$es6$promise$$internal$$fulfill(promise, enumerator._result);
+      }
+    };
+
+    lib$es6$promise$enumerator$$Enumerator.prototype._willSettleAt = function(promise, i) {
+      var enumerator = this;
+
+      lib$es6$promise$$internal$$subscribe(promise, undefined, function(value) {
+        enumerator._settledAt(lib$es6$promise$$internal$$FULFILLED, i, value);
+      }, function(reason) {
+        enumerator._settledAt(lib$es6$promise$$internal$$REJECTED, i, reason);
+      });
+    };
+    function lib$es6$promise$promise$all$$all(entries) {
+      return new lib$es6$promise$enumerator$$default(this, entries).promise;
+    }
+    var lib$es6$promise$promise$all$$default = lib$es6$promise$promise$all$$all;
+    function lib$es6$promise$promise$race$$race(entries) {
+      /*jshint validthis:true */
+      var Constructor = this;
+
+      var promise = new Constructor(lib$es6$promise$$internal$$noop);
+
+      if (!lib$es6$promise$utils$$isArray(entries)) {
+        lib$es6$promise$$internal$$reject(promise, new TypeError('You must pass an array to race.'));
+        return promise;
+      }
+
+      var length = entries.length;
+
+      function onFulfillment(value) {
+        lib$es6$promise$$internal$$resolve(promise, value);
+      }
+
+      function onRejection(reason) {
+        lib$es6$promise$$internal$$reject(promise, reason);
+      }
+
+      for (var i = 0; promise._state === lib$es6$promise$$internal$$PENDING && i < length; i++) {
+        lib$es6$promise$$internal$$subscribe(Constructor.resolve(entries[i]), undefined, onFulfillment, onRejection);
+      }
+
+      return promise;
+    }
+    var lib$es6$promise$promise$race$$default = lib$es6$promise$promise$race$$race;
+    function lib$es6$promise$promise$resolve$$resolve(object) {
+      /*jshint validthis:true */
+      var Constructor = this;
+
+      if (object && typeof object === 'object' && object.constructor === Constructor) {
+        return object;
+      }
+
+      var promise = new Constructor(lib$es6$promise$$internal$$noop);
+      lib$es6$promise$$internal$$resolve(promise, object);
+      return promise;
+    }
+    var lib$es6$promise$promise$resolve$$default = lib$es6$promise$promise$resolve$$resolve;
+    function lib$es6$promise$promise$reject$$reject(reason) {
+      /*jshint validthis:true */
+      var Constructor = this;
+      var promise = new Constructor(lib$es6$promise$$internal$$noop);
+      lib$es6$promise$$internal$$reject(promise, reason);
+      return promise;
+    }
+    var lib$es6$promise$promise$reject$$default = lib$es6$promise$promise$reject$$reject;
+
+    var lib$es6$promise$promise$$counter = 0;
+
+    function lib$es6$promise$promise$$needsResolver() {
+      throw new TypeError('You must pass a resolver function as the first argument to the promise constructor');
+    }
+
+    function lib$es6$promise$promise$$needsNew() {
+      throw new TypeError("Failed to construct 'Promise': Please use the 'new' operator, this object constructor cannot be called as a function.");
+    }
+
+    var lib$es6$promise$promise$$default = lib$es6$promise$promise$$Promise;
+    /**
+      Promise objects represent the eventual result of an asynchronous operation. The
+      primary way of interacting with a promise is through its `then` method, which
+      registers callbacks to receive either a promise’s eventual value or the reason
+      why the promise cannot be fulfilled.
+
+      Terminology
+      -----------
+
+      - `promise` is an object or function with a `then` method whose behavior conforms to this specification.
+      - `thenable` is an object or function that defines a `then` method.
+      - `value` is any legal JavaScript value (including undefined, a thenable, or a promise).
+      - `exception` is a value that is thrown using the throw statement.
+      - `reason` is a value that indicates why a promise was rejected.
+      - `settled` the final resting state of a promise, fulfilled or rejected.
+
+      A promise can be in one of three states: pending, fulfilled, or rejected.
+
+      Promises that are fulfilled have a fulfillment value and are in the fulfilled
+      state.  Promises that are rejected have a rejection reason and are in the
+      rejected state.  A fulfillment value is never a thenable.
+
+      Promises can also be said to *resolve* a value.  If this value is also a
+      promise, then the original promise's settled state will match the value's
+      settled state.  So a promise that *resolves* a promise that rejects will
+      itself reject, and a promise that *resolves* a promise that fulfills will
+      itself fulfill.
+
+
+      Basic Usage:
+      ------------
+
+      ```js
+      var promise = new Promise(function(resolve, reject) {
+        // on success
+        resolve(value);
+
+        // on failure
+        reject(reason);
+      });
+
+      promise.then(function(value) {
+        // on fulfillment
+      }, function(reason) {
+        // on rejection
+      });
+      ```
+
+      Advanced Usage:
+      ---------------
+
+      Promises shine when abstracting away asynchronous interactions such as
+      `XMLHttpRequest`s.
+
+      ```js
+      function getJSON(url) {
+        return new Promise(function(resolve, reject){
+          var xhr = new XMLHttpRequest();
+
+          xhr.open('GET', url);
+          xhr.onreadystatechange = handler;
+          xhr.responseType = 'json';
+          xhr.setRequestHeader('Accept', 'application/json');
+          xhr.send();
+
+          function handler() {
+            if (this.readyState === this.DONE) {
+              if (this.status === 200) {
+                resolve(this.response);
+              } else {
+                reject(new Error('getJSON: `' + url + '` failed with status: [' + this.status + ']'));
+              }
+            }
+          };
+        });
+      }
+
+      getJSON('/posts.json').then(function(json) {
+        // on fulfillment
+      }, function(reason) {
+        // on rejection
+      });
+      ```
+
+      Unlike callbacks, promises are great composable primitives.
+
+      ```js
+      Promise.all([
+        getJSON('/posts'),
+        getJSON('/comments')
+      ]).then(function(values){
+        values[0] // => postsJSON
+        values[1] // => commentsJSON
+
+        return values;
+      });
+      ```
+
+      @class Promise
+      @param {function} resolver
+      Useful for tooling.
+      @constructor
+    */
+    function lib$es6$promise$promise$$Promise(resolver) {
+      this._id = lib$es6$promise$promise$$counter++;
+      this._state = undefined;
+      this._result = undefined;
+      this._subscribers = [];
+
+      if (lib$es6$promise$$internal$$noop !== resolver) {
+        if (!lib$es6$promise$utils$$isFunction(resolver)) {
+          lib$es6$promise$promise$$needsResolver();
+        }
+
+        if (!(this instanceof lib$es6$promise$promise$$Promise)) {
+          lib$es6$promise$promise$$needsNew();
+        }
+
+        lib$es6$promise$$internal$$initializePromise(this, resolver);
+      }
+    }
+
+    lib$es6$promise$promise$$Promise.all = lib$es6$promise$promise$all$$default;
+    lib$es6$promise$promise$$Promise.race = lib$es6$promise$promise$race$$default;
+    lib$es6$promise$promise$$Promise.resolve = lib$es6$promise$promise$resolve$$default;
+    lib$es6$promise$promise$$Promise.reject = lib$es6$promise$promise$reject$$default;
+
+    lib$es6$promise$promise$$Promise.prototype = {
+      constructor: lib$es6$promise$promise$$Promise,
+
+    /**
+      The primary way of interacting with a promise is through its `then` method,
+      which registers callbacks to receive either a promise's eventual value or the
+      reason why the promise cannot be fulfilled.
+
+      ```js
+      findUser().then(function(user){
+        // user is available
+      }, function(reason){
+        // user is unavailable, and you are given the reason why
+      });
+      ```
+
+      Chaining
+      --------
+
+      The return value of `then` is itself a promise.  This second, 'downstream'
+      promise is resolved with the return value of the first promise's fulfillment
+      or rejection handler, or rejected if the handler throws an exception.
+
+      ```js
+      findUser().then(function (user) {
+        return user.name;
+      }, function (reason) {
+        return 'default name';
+      }).then(function (userName) {
+        // If `findUser` fulfilled, `userName` will be the user's name, otherwise it
+        // will be `'default name'`
+      });
+
+      findUser().then(function (user) {
+        throw new Error('Found user, but still unhappy');
+      }, function (reason) {
+        throw new Error('`findUser` rejected and we're unhappy');
+      }).then(function (value) {
+        // never reached
+      }, function (reason) {
+        // if `findUser` fulfilled, `reason` will be 'Found user, but still unhappy'.
+        // If `findUser` rejected, `reason` will be '`findUser` rejected and we're unhappy'.
+      });
+      ```
+      If the downstream promise does not specify a rejection handler, rejection reasons will be propagated further downstream.
+
+      ```js
+      findUser().then(function (user) {
+        throw new PedagogicalException('Upstream error');
+      }).then(function (value) {
+        // never reached
+      }).then(function (value) {
+        // never reached
+      }, function (reason) {
+        // The `PedgagocialException` is propagated all the way down to here
+      });
+      ```
+
+      Assimilation
+      ------------
+
+      Sometimes the value you want to propagate to a downstream promise can only be
+      retrieved asynchronously. This can be achieved by returning a promise in the
+      fulfillment or rejection handler. The downstream promise will then be pending
+      until the returned promise is settled. This is called *assimilation*.
+
+      ```js
+      findUser().then(function (user) {
+        return findCommentsByAuthor(user);
+      }).then(function (comments) {
+        // The user's comments are now available
+      });
+      ```
+
+      If the assimliated promise rejects, then the downstream promise will also reject.
+
+      ```js
+      findUser().then(function (user) {
+        return findCommentsByAuthor(user);
+      }).then(function (comments) {
+        // If `findCommentsByAuthor` fulfills, we'll have the value here
+      }, function (reason) {
+        // If `findCommentsByAuthor` rejects, we'll have the reason here
+      });
+      ```
+
+      Simple Example
+      --------------
+
+      Synchronous Example
+
+      ```javascript
+      var result;
+
+      try {
+        result = findResult();
+        // success
+      } catch(reason) {
+        // failure
+      }
+      ```
+
+      Errback Example
+
+      ```js
+      findResult(function(result, err){
+        if (err) {
+          // failure
+        } else {
+          // success
+        }
+      });
+      ```
+
+      Promise Example;
+
+      ```javascript
+      findResult().then(function(result){
+        // success
+      }, function(reason){
+        // failure
+      });
+      ```
+
+      Advanced Example
+      --------------
+
+      Synchronous Example
+
+      ```javascript
+      var author, books;
+
+      try {
+        author = findAuthor();
+        books  = findBooksByAuthor(author);
+        // success
+      } catch(reason) {
+        // failure
+      }
+      ```
+
+      Errback Example
+
+      ```js
+
+      function foundBooks(books) {
+
+      }
+
+      function failure(reason) {
+
+      }
+
+      findAuthor(function(author, err){
+        if (err) {
+          failure(err);
+          // failure
+        } else {
+          try {
+            findBoooksByAuthor(author, function(books, err) {
+              if (err) {
+                failure(err);
+              } else {
+                try {
+                  foundBooks(books);
+                } catch(reason) {
+                  failure(reason);
+                }
+              }
+            });
+          } catch(error) {
+            failure(err);
+          }
+          // success
+        }
+      });
+      ```
+
+      Promise Example;
+
+      ```javascript
+      findAuthor().
+        then(findBooksByAuthor).
+        then(function(books){
+          // found books
+      }).catch(function(reason){
+        // something went wrong
+      });
+      ```
+
+      @method then
+      @param {Function} onFulfilled
+      @param {Function} onRejected
+      Useful for tooling.
+      @return {Promise}
+    */
+      then: function(onFulfillment, onRejection) {
+        var parent = this;
+        var state = parent._state;
+
+        if (state === lib$es6$promise$$internal$$FULFILLED && !onFulfillment || state === lib$es6$promise$$internal$$REJECTED && !onRejection) {
+          return this;
+        }
+
+        var child = new this.constructor(lib$es6$promise$$internal$$noop);
+        var result = parent._result;
+
+        if (state) {
+          var callback = arguments[state - 1];
+          lib$es6$promise$asap$$default(function(){
+            lib$es6$promise$$internal$$invokeCallback(state, child, callback, result);
+          });
+        } else {
+          lib$es6$promise$$internal$$subscribe(parent, child, onFulfillment, onRejection);
+        }
+
+        return child;
+      },
+
+    /**
+      `catch` is simply sugar for `then(undefined, onRejection)` which makes it the same
+      as the catch block of a try/catch statement.
+
+      ```js
+      function findAuthor(){
+        throw new Error('couldn't find that author');
+      }
+
+      // synchronous
+      try {
+        findAuthor();
+      } catch(reason) {
+        // something went wrong
+      }
+
+      // async with promises
+      findAuthor().catch(function(reason){
+        // something went wrong
+      });
+      ```
+
+      @method catch
+      @param {Function} onRejection
+      Useful for tooling.
+      @return {Promise}
+    */
+      'catch': function(onRejection) {
+        return this.then(null, onRejection);
+      }
+    };
+    function lib$es6$promise$polyfill$$polyfill() {
+      var local;
+
+      if (typeof global !== 'undefined') {
+          local = global;
+      } else if (typeof self !== 'undefined') {
+          local = self;
+      } else {
+          try {
+              local = Function('return this')();
+          } catch (e) {
+              throw new Error('polyfill failed because global object is unavailable in this environment');
+          }
+      }
+
+      var P = local.Promise;
+
+      if (P && Object.prototype.toString.call(P.resolve()) === '[object Promise]' && !P.cast) {
+        return;
+      }
+
+      local.Promise = lib$es6$promise$promise$$default;
+    }
+    var lib$es6$promise$polyfill$$default = lib$es6$promise$polyfill$$polyfill;
+
+    var lib$es6$promise$umd$$ES6Promise = {
+      'Promise': lib$es6$promise$promise$$default,
+      'polyfill': lib$es6$promise$polyfill$$default
+    };
+
+    /* global define:true module:true window: true */
+    if (typeof define === 'function' && define['amd']) {
+      define(function() { return lib$es6$promise$umd$$ES6Promise; });
+    } else if (typeof module !== 'undefined' && module['exports']) {
+      module['exports'] = lib$es6$promise$umd$$ES6Promise;
+    } else if (typeof this !== 'undefined') {
+      this['ES6Promise'] = lib$es6$promise$umd$$ES6Promise;
+    }
+
+    lib$es6$promise$polyfill$$default();
+}).call(this);
 
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":2}],4:[function(require,module,exports){
+
+},{"_process":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/browserify/node_modules/process/browser.js"}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars.runtime.js":[function(require,module,exports){
 (function (global){
-"use strict";var base=require("./handlebars/base"),SafeString=require("./handlebars/safe-string")["default"],Exception=require("./handlebars/exception")["default"],Utils=require("./handlebars/utils"),runtime=require("./handlebars/runtime"),create=function(){var e=new base.HandlebarsEnvironment;return Utils.extend(e,base),e.SafeString=SafeString,e.Exception=Exception,e.Utils=Utils,e.escapeExpression=Utils.escapeExpression,e.VM=runtime,e.template=function(a){return runtime.template(a,e)},e},Handlebars=create();Handlebars.create=create;var root="undefined"!=typeof global?global:window,$Handlebars=root.Handlebars;Handlebars.noConflict=function(){root.Handlebars===Handlebars&&(root.Handlebars=$Handlebars)},Handlebars["default"]=Handlebars,exports["default"]=Handlebars;
+'use strict';
 
+var _interopRequireWildcard = function (obj) { return obj && obj.__esModule ? obj : { 'default': obj }; };
 
+exports.__esModule = true;
+/*global window */
+
+var _import = require('./handlebars/base');
+
+var base = _interopRequireWildcard(_import);
+
+// Each of these augment the Handlebars object. No need to setup here.
+// (This is done to easily share code between commonjs and browse envs)
+
+var _SafeString = require('./handlebars/safe-string');
+
+var _SafeString2 = _interopRequireWildcard(_SafeString);
+
+var _Exception = require('./handlebars/exception');
+
+var _Exception2 = _interopRequireWildcard(_Exception);
+
+var _import2 = require('./handlebars/utils');
+
+var Utils = _interopRequireWildcard(_import2);
+
+var _import3 = require('./handlebars/runtime');
+
+var runtime = _interopRequireWildcard(_import3);
+
+// For compatibility and usage outside of module systems, make the Handlebars object a namespace
+function create() {
+  var hb = new base.HandlebarsEnvironment();
+
+  Utils.extend(hb, base);
+  hb.SafeString = _SafeString2['default'];
+  hb.Exception = _Exception2['default'];
+  hb.Utils = Utils;
+  hb.escapeExpression = Utils.escapeExpression;
+
+  hb.VM = runtime;
+  hb.template = function (spec) {
+    return runtime.template(spec, hb);
+  };
+
+  return hb;
+}
+
+var Handlebars = create();
+Handlebars.create = create;
+
+/*jshint -W040 */
+/* istanbul ignore next */
+var root = typeof global !== 'undefined' ? global : window,
+    $Handlebars = root.Handlebars;
+/* istanbul ignore next */
+Handlebars.noConflict = function () {
+  if (root.Handlebars === Handlebars) {
+    root.Handlebars = $Handlebars;
+  }
+};
+
+Handlebars['default'] = Handlebars;
+
+exports['default'] = Handlebars;
+module.exports = exports['default'];
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./handlebars/base":5,"./handlebars/exception":6,"./handlebars/runtime":7,"./handlebars/safe-string":8,"./handlebars/utils":9}],5:[function(require,module,exports){
-"use strict";function HandlebarsEnvironment(e,t){this.helpers=e||{},this.partials=t||{},registerDefaultHelpers(this)}function registerDefaultHelpers(e){e.registerHelper("helperMissing",function(){if(1===arguments.length)return void 0;throw new Exception("Missing helper: '"+arguments[arguments.length-1].name+"'")}),e.registerHelper("blockHelperMissing",function(t,r){var n=r.inverse,i=r.fn;if(t===!0)return i(this);if(t===!1||null==t)return n(this);if(isArray(t))return t.length>0?(r.ids&&(r.ids=[r.name]),e.helpers.each(t,r)):n(this);if(r.data&&r.ids){var a=createFrame(r.data);a.contextPath=Utils.appendContextPath(r.data.contextPath,r.name),r={data:a}}return i(t,r)}),e.registerHelper("each",function(e,t){function r(t,r,s){n&&(n.key=t,n.index=r,n.first=0===r,n.last=!!s,i&&(n.contextPath=i+t)),o+=a(e[t],{data:n,blockParams:Utils.blockParams([e[t],t],[i+t,null])})}if(!t)throw new Exception("Must pass iterator to #each");var n,i,a=t.fn,s=t.inverse,l=0,o="";if(t.data&&t.ids&&(i=Utils.appendContextPath(t.data.contextPath,t.ids[0])+"."),isFunction(e)&&(e=e.call(this)),t.data&&(n=createFrame(t.data)),e&&"object"==typeof e)if(isArray(e))for(var c=e.length;c>l;l++)r(l,l,l===e.length-1);else{var p;for(var h in e)e.hasOwnProperty(h)&&(p&&r(p,l-1),p=h,l++);p&&r(p,l-1,!0)}return 0===l&&(o=s(this)),o}),e.registerHelper("if",function(e,t){return isFunction(e)&&(e=e.call(this)),!t.hash.includeZero&&!e||Utils.isEmpty(e)?t.inverse(this):t.fn(this)}),e.registerHelper("unless",function(t,r){return e.helpers["if"].call(this,t,{fn:r.inverse,inverse:r.fn,hash:r.hash})}),e.registerHelper("with",function(e,t){isFunction(e)&&(e=e.call(this));var r=t.fn;if(Utils.isEmpty(e))return t.inverse(this);if(t.data&&t.ids){var n=createFrame(t.data);n.contextPath=Utils.appendContextPath(t.data.contextPath,t.ids[0]),t={data:n}}return r(e,t)}),e.registerHelper("log",function(t,r){var n=r.data&&null!=r.data.level?parseInt(r.data.level,10):1;e.log(n,t)}),e.registerHelper("lookup",function(e,t){return e&&e[t]})}var Utils=require("./utils"),Exception=require("./exception")["default"],VERSION="3.0.1";exports.VERSION=VERSION;var COMPILER_REVISION=6;exports.COMPILER_REVISION=COMPILER_REVISION;var REVISION_CHANGES={1:"<= 1.0.rc.2",2:"== 1.0.0-rc.3",3:"== 1.0.0-rc.4",4:"== 1.x.x",5:"== 2.0.0-alpha.x",6:">= 2.0.0-beta.1"};exports.REVISION_CHANGES=REVISION_CHANGES;var isArray=Utils.isArray,isFunction=Utils.isFunction,toString=Utils.toString,objectType="[object Object]";exports.HandlebarsEnvironment=HandlebarsEnvironment,HandlebarsEnvironment.prototype={constructor:HandlebarsEnvironment,logger:logger,log:log,registerHelper:function(e,t){if(toString.call(e)===objectType){if(t)throw new Exception("Arg not supported with multiple helpers");Utils.extend(this.helpers,e)}else this.helpers[e]=t},unregisterHelper:function(e){delete this.helpers[e]},registerPartial:function(e,t){if(toString.call(e)===objectType)Utils.extend(this.partials,e);else{if("undefined"==typeof t)throw new Exception("Attempting to register a partial as undefined");this.partials[e]=t}},unregisterPartial:function(e){delete this.partials[e]}};var logger={methodMap:{0:"debug",1:"info",2:"warn",3:"error"},DEBUG:0,INFO:1,WARN:2,ERROR:3,level:1,log:function(e,t){if("undefined"!=typeof console&&logger.level<=e){var r=logger.methodMap[e];(console[r]||console.log).call(console,t)}}};exports.logger=logger;var log=logger.log;exports.log=log;var createFrame=function(e){var t=Utils.extend({},e);return t._parent=e,t};exports.createFrame=createFrame;
+
+},{"./handlebars/base":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/base.js","./handlebars/exception":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/exception.js","./handlebars/runtime":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/runtime.js","./handlebars/safe-string":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/safe-string.js","./handlebars/utils":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/utils.js"}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/base.js":[function(require,module,exports){
+'use strict';
+
+var _interopRequireWildcard = function (obj) { return obj && obj.__esModule ? obj : { 'default': obj }; };
+
+exports.__esModule = true;
+exports.HandlebarsEnvironment = HandlebarsEnvironment;
+exports.createFrame = createFrame;
+
+var _import = require('./utils');
+
+var Utils = _interopRequireWildcard(_import);
+
+var _Exception = require('./exception');
+
+var _Exception2 = _interopRequireWildcard(_Exception);
+
+var VERSION = '3.0.1';
+exports.VERSION = VERSION;
+var COMPILER_REVISION = 6;
+
+exports.COMPILER_REVISION = COMPILER_REVISION;
+var REVISION_CHANGES = {
+  1: '<= 1.0.rc.2', // 1.0.rc.2 is actually rev2 but doesn't report it
+  2: '== 1.0.0-rc.3',
+  3: '== 1.0.0-rc.4',
+  4: '== 1.x.x',
+  5: '== 2.0.0-alpha.x',
+  6: '>= 2.0.0-beta.1'
+};
+
+exports.REVISION_CHANGES = REVISION_CHANGES;
+var isArray = Utils.isArray,
+    isFunction = Utils.isFunction,
+    toString = Utils.toString,
+    objectType = '[object Object]';
+
+function HandlebarsEnvironment(helpers, partials) {
+  this.helpers = helpers || {};
+  this.partials = partials || {};
+
+  registerDefaultHelpers(this);
+}
+
+HandlebarsEnvironment.prototype = {
+  constructor: HandlebarsEnvironment,
+
+  logger: logger,
+  log: log,
+
+  registerHelper: function registerHelper(name, fn) {
+    if (toString.call(name) === objectType) {
+      if (fn) {
+        throw new _Exception2['default']('Arg not supported with multiple helpers');
+      }
+      Utils.extend(this.helpers, name);
+    } else {
+      this.helpers[name] = fn;
+    }
+  },
+  unregisterHelper: function unregisterHelper(name) {
+    delete this.helpers[name];
+  },
+
+  registerPartial: function registerPartial(name, partial) {
+    if (toString.call(name) === objectType) {
+      Utils.extend(this.partials, name);
+    } else {
+      if (typeof partial === 'undefined') {
+        throw new _Exception2['default']('Attempting to register a partial as undefined');
+      }
+      this.partials[name] = partial;
+    }
+  },
+  unregisterPartial: function unregisterPartial(name) {
+    delete this.partials[name];
+  }
+};
+
+function registerDefaultHelpers(instance) {
+  instance.registerHelper('helperMissing', function () {
+    if (arguments.length === 1) {
+      // A missing field in a {{foo}} constuct.
+      return undefined;
+    } else {
+      // Someone is actually trying to call something, blow up.
+      throw new _Exception2['default']('Missing helper: "' + arguments[arguments.length - 1].name + '"');
+    }
+  });
+
+  instance.registerHelper('blockHelperMissing', function (context, options) {
+    var inverse = options.inverse,
+        fn = options.fn;
+
+    if (context === true) {
+      return fn(this);
+    } else if (context === false || context == null) {
+      return inverse(this);
+    } else if (isArray(context)) {
+      if (context.length > 0) {
+        if (options.ids) {
+          options.ids = [options.name];
+        }
+
+        return instance.helpers.each(context, options);
+      } else {
+        return inverse(this);
+      }
+    } else {
+      if (options.data && options.ids) {
+        var data = createFrame(options.data);
+        data.contextPath = Utils.appendContextPath(options.data.contextPath, options.name);
+        options = { data: data };
+      }
+
+      return fn(context, options);
+    }
+  });
+
+  instance.registerHelper('each', function (context, options) {
+    if (!options) {
+      throw new _Exception2['default']('Must pass iterator to #each');
+    }
+
+    var fn = options.fn,
+        inverse = options.inverse,
+        i = 0,
+        ret = '',
+        data = undefined,
+        contextPath = undefined;
+
+    if (options.data && options.ids) {
+      contextPath = Utils.appendContextPath(options.data.contextPath, options.ids[0]) + '.';
+    }
+
+    if (isFunction(context)) {
+      context = context.call(this);
+    }
+
+    if (options.data) {
+      data = createFrame(options.data);
+    }
+
+    function execIteration(field, index, last) {
+      if (data) {
+        data.key = field;
+        data.index = index;
+        data.first = index === 0;
+        data.last = !!last;
+
+        if (contextPath) {
+          data.contextPath = contextPath + field;
+        }
+      }
+
+      ret = ret + fn(context[field], {
+        data: data,
+        blockParams: Utils.blockParams([context[field], field], [contextPath + field, null])
+      });
+    }
+
+    if (context && typeof context === 'object') {
+      if (isArray(context)) {
+        for (var j = context.length; i < j; i++) {
+          execIteration(i, i, i === context.length - 1);
+        }
+      } else {
+        var priorKey = undefined;
+
+        for (var key in context) {
+          if (context.hasOwnProperty(key)) {
+            // We're running the iterations one step out of sync so we can detect
+            // the last iteration without have to scan the object twice and create
+            // an itermediate keys array.
+            if (priorKey) {
+              execIteration(priorKey, i - 1);
+            }
+            priorKey = key;
+            i++;
+          }
+        }
+        if (priorKey) {
+          execIteration(priorKey, i - 1, true);
+        }
+      }
+    }
+
+    if (i === 0) {
+      ret = inverse(this);
+    }
+
+    return ret;
+  });
+
+  instance.registerHelper('if', function (conditional, options) {
+    if (isFunction(conditional)) {
+      conditional = conditional.call(this);
+    }
+
+    // Default behavior is to render the positive path if the value is truthy and not empty.
+    // The `includeZero` option may be set to treat the condtional as purely not empty based on the
+    // behavior of isEmpty. Effectively this determines if 0 is handled by the positive path or negative.
+    if (!options.hash.includeZero && !conditional || Utils.isEmpty(conditional)) {
+      return options.inverse(this);
+    } else {
+      return options.fn(this);
+    }
+  });
+
+  instance.registerHelper('unless', function (conditional, options) {
+    return instance.helpers['if'].call(this, conditional, { fn: options.inverse, inverse: options.fn, hash: options.hash });
+  });
+
+  instance.registerHelper('with', function (context, options) {
+    if (isFunction(context)) {
+      context = context.call(this);
+    }
+
+    var fn = options.fn;
+
+    if (!Utils.isEmpty(context)) {
+      if (options.data && options.ids) {
+        var data = createFrame(options.data);
+        data.contextPath = Utils.appendContextPath(options.data.contextPath, options.ids[0]);
+        options = { data: data };
+      }
+
+      return fn(context, options);
+    } else {
+      return options.inverse(this);
+    }
+  });
+
+  instance.registerHelper('log', function (message, options) {
+    var level = options.data && options.data.level != null ? parseInt(options.data.level, 10) : 1;
+    instance.log(level, message);
+  });
+
+  instance.registerHelper('lookup', function (obj, field) {
+    return obj && obj[field];
+  });
+}
+
+var logger = {
+  methodMap: { 0: 'debug', 1: 'info', 2: 'warn', 3: 'error' },
+
+  // State enum
+  DEBUG: 0,
+  INFO: 1,
+  WARN: 2,
+  ERROR: 3,
+  level: 1,
+
+  // Can be overridden in the host environment
+  log: function log(level, message) {
+    if (typeof console !== 'undefined' && logger.level <= level) {
+      var method = logger.methodMap[level];
+      (console[method] || console.log).call(console, message); // eslint-disable-line no-console
+    }
+  }
+};
+
+exports.logger = logger;
+var log = logger.log;
+
+exports.log = log;
+
+function createFrame(object) {
+  var frame = Utils.extend({}, object);
+  frame._parent = object;
+  return frame;
+}
+
+/* [args, ]options */
+},{"./exception":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/exception.js","./utils":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/utils.js"}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/exception.js":[function(require,module,exports){
+'use strict';
+
+exports.__esModule = true;
+
+var errorProps = ['description', 'fileName', 'lineNumber', 'message', 'name', 'number', 'stack'];
+
+function Exception(message, node) {
+  var loc = node && node.loc,
+      line = undefined,
+      column = undefined;
+  if (loc) {
+    line = loc.start.line;
+    column = loc.start.column;
+
+    message += ' - ' + line + ':' + column;
+  }
+
+  var tmp = Error.prototype.constructor.call(this, message);
+
+  // Unfortunately errors are not enumerable in Chrome (at least), so `for prop in tmp` doesn't work.
+  for (var idx = 0; idx < errorProps.length; idx++) {
+    this[errorProps[idx]] = tmp[errorProps[idx]];
+  }
+
+  if (Error.captureStackTrace) {
+    Error.captureStackTrace(this, Exception);
+  }
+
+  if (loc) {
+    this.lineNumber = line;
+    this.column = column;
+  }
+}
+
+Exception.prototype = new Error();
+
+exports['default'] = Exception;
+module.exports = exports['default'];
+},{}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/runtime.js":[function(require,module,exports){
+'use strict';
+
+var _interopRequireWildcard = function (obj) { return obj && obj.__esModule ? obj : { 'default': obj }; };
+
+exports.__esModule = true;
+exports.checkRevision = checkRevision;
+
+// TODO: Remove this line and break up compilePartial
+
+exports.template = template;
+exports.wrapProgram = wrapProgram;
+exports.resolvePartial = resolvePartial;
+exports.invokePartial = invokePartial;
+exports.noop = noop;
+
+var _import = require('./utils');
+
+var Utils = _interopRequireWildcard(_import);
+
+var _Exception = require('./exception');
+
+var _Exception2 = _interopRequireWildcard(_Exception);
+
+var _COMPILER_REVISION$REVISION_CHANGES$createFrame = require('./base');
+
+function checkRevision(compilerInfo) {
+  var compilerRevision = compilerInfo && compilerInfo[0] || 1,
+      currentRevision = _COMPILER_REVISION$REVISION_CHANGES$createFrame.COMPILER_REVISION;
+
+  if (compilerRevision !== currentRevision) {
+    if (compilerRevision < currentRevision) {
+      var runtimeVersions = _COMPILER_REVISION$REVISION_CHANGES$createFrame.REVISION_CHANGES[currentRevision],
+          compilerVersions = _COMPILER_REVISION$REVISION_CHANGES$createFrame.REVISION_CHANGES[compilerRevision];
+      throw new _Exception2['default']('Template was precompiled with an older version of Handlebars than the current runtime. ' + 'Please update your precompiler to a newer version (' + runtimeVersions + ') or downgrade your runtime to an older version (' + compilerVersions + ').');
+    } else {
+      // Use the embedded version info since the runtime doesn't know about this revision yet
+      throw new _Exception2['default']('Template was precompiled with a newer version of Handlebars than the current runtime. ' + 'Please update your runtime to a newer version (' + compilerInfo[1] + ').');
+    }
+  }
+}
+
+function template(templateSpec, env) {
+  /* istanbul ignore next */
+  if (!env) {
+    throw new _Exception2['default']('No environment passed to template');
+  }
+  if (!templateSpec || !templateSpec.main) {
+    throw new _Exception2['default']('Unknown template object: ' + typeof templateSpec);
+  }
+
+  // Note: Using env.VM references rather than local var references throughout this section to allow
+  // for external users to override these as psuedo-supported APIs.
+  env.VM.checkRevision(templateSpec.compiler);
+
+  function invokePartialWrapper(partial, context, options) {
+    if (options.hash) {
+      context = Utils.extend({}, context, options.hash);
+    }
+
+    partial = env.VM.resolvePartial.call(this, partial, context, options);
+    var result = env.VM.invokePartial.call(this, partial, context, options);
+
+    if (result == null && env.compile) {
+      options.partials[options.name] = env.compile(partial, templateSpec.compilerOptions, env);
+      result = options.partials[options.name](context, options);
+    }
+    if (result != null) {
+      if (options.indent) {
+        var lines = result.split('\n');
+        for (var i = 0, l = lines.length; i < l; i++) {
+          if (!lines[i] && i + 1 === l) {
+            break;
+          }
+
+          lines[i] = options.indent + lines[i];
+        }
+        result = lines.join('\n');
+      }
+      return result;
+    } else {
+      throw new _Exception2['default']('The partial ' + options.name + ' could not be compiled when running in runtime-only mode');
+    }
+  }
+
+  // Just add water
+  var container = {
+    strict: function strict(obj, name) {
+      if (!(name in obj)) {
+        throw new _Exception2['default']('"' + name + '" not defined in ' + obj);
+      }
+      return obj[name];
+    },
+    lookup: function lookup(depths, name) {
+      var len = depths.length;
+      for (var i = 0; i < len; i++) {
+        if (depths[i] && depths[i][name] != null) {
+          return depths[i][name];
+        }
+      }
+    },
+    lambda: function lambda(current, context) {
+      return typeof current === 'function' ? current.call(context) : current;
+    },
+
+    escapeExpression: Utils.escapeExpression,
+    invokePartial: invokePartialWrapper,
+
+    fn: function fn(i) {
+      return templateSpec[i];
+    },
+
+    programs: [],
+    program: function program(i, data, declaredBlockParams, blockParams, depths) {
+      var programWrapper = this.programs[i],
+          fn = this.fn(i);
+      if (data || depths || blockParams || declaredBlockParams) {
+        programWrapper = wrapProgram(this, i, fn, data, declaredBlockParams, blockParams, depths);
+      } else if (!programWrapper) {
+        programWrapper = this.programs[i] = wrapProgram(this, i, fn);
+      }
+      return programWrapper;
+    },
+
+    data: function data(value, depth) {
+      while (value && depth--) {
+        value = value._parent;
+      }
+      return value;
+    },
+    merge: function merge(param, common) {
+      var obj = param || common;
+
+      if (param && common && param !== common) {
+        obj = Utils.extend({}, common, param);
+      }
+
+      return obj;
+    },
+
+    noop: env.VM.noop,
+    compilerInfo: templateSpec.compiler
+  };
+
+  function ret(context) {
+    var options = arguments[1] === undefined ? {} : arguments[1];
+
+    var data = options.data;
+
+    ret._setup(options);
+    if (!options.partial && templateSpec.useData) {
+      data = initData(context, data);
+    }
+    var depths = undefined,
+        blockParams = templateSpec.useBlockParams ? [] : undefined;
+    if (templateSpec.useDepths) {
+      depths = options.depths ? [context].concat(options.depths) : [context];
+    }
+
+    return templateSpec.main.call(container, context, container.helpers, container.partials, data, blockParams, depths);
+  }
+  ret.isTop = true;
+
+  ret._setup = function (options) {
+    if (!options.partial) {
+      container.helpers = container.merge(options.helpers, env.helpers);
+
+      if (templateSpec.usePartial) {
+        container.partials = container.merge(options.partials, env.partials);
+      }
+    } else {
+      container.helpers = options.helpers;
+      container.partials = options.partials;
+    }
+  };
+
+  ret._child = function (i, data, blockParams, depths) {
+    if (templateSpec.useBlockParams && !blockParams) {
+      throw new _Exception2['default']('must pass block params');
+    }
+    if (templateSpec.useDepths && !depths) {
+      throw new _Exception2['default']('must pass parent depths');
+    }
+
+    return wrapProgram(container, i, templateSpec[i], data, 0, blockParams, depths);
+  };
+  return ret;
+}
+
+function wrapProgram(container, i, fn, data, declaredBlockParams, blockParams, depths) {
+  function prog(context) {
+    var options = arguments[1] === undefined ? {} : arguments[1];
+
+    return fn.call(container, context, container.helpers, container.partials, options.data || data, blockParams && [options.blockParams].concat(blockParams), depths && [context].concat(depths));
+  }
+  prog.program = i;
+  prog.depth = depths ? depths.length : 0;
+  prog.blockParams = declaredBlockParams || 0;
+  return prog;
+}
+
+function resolvePartial(partial, context, options) {
+  if (!partial) {
+    partial = options.partials[options.name];
+  } else if (!partial.call && !options.name) {
+    // This is a dynamic partial that returned a string
+    options.name = partial;
+    partial = options.partials[partial];
+  }
+  return partial;
+}
+
+function invokePartial(partial, context, options) {
+  options.partial = true;
+
+  if (partial === undefined) {
+    throw new _Exception2['default']('The partial ' + options.name + ' could not be found');
+  } else if (partial instanceof Function) {
+    return partial(context, options);
+  }
+}
+
+function noop() {
+  return '';
+}
+
+function initData(context, data) {
+  if (!data || !('root' in data)) {
+    data = data ? _COMPILER_REVISION$REVISION_CHANGES$createFrame.createFrame(data) : {};
+    data.root = context;
+  }
+  return data;
+}
+},{"./base":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/base.js","./exception":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/exception.js","./utils":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/utils.js"}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/safe-string.js":[function(require,module,exports){
+'use strict';
+
+exports.__esModule = true;
+// Build out our basic SafeString type
+function SafeString(string) {
+  this.string = string;
+}
+
+SafeString.prototype.toString = SafeString.prototype.toHTML = function () {
+  return '' + this.string;
+};
+
+exports['default'] = SafeString;
+module.exports = exports['default'];
+},{}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars/utils.js":[function(require,module,exports){
+'use strict';
+
+exports.__esModule = true;
+exports.extend = extend;
+
+// Older IE versions do not directly support indexOf so we must implement our own, sadly.
+exports.indexOf = indexOf;
+exports.escapeExpression = escapeExpression;
+exports.isEmpty = isEmpty;
+exports.blockParams = blockParams;
+exports.appendContextPath = appendContextPath;
+/*jshint -W004 */
+var escape = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  '\'': '&#x27;',
+  '`': '&#x60;'
+};
+
+var badChars = /[&<>"'`]/g,
+    possible = /[&<>"'`]/;
+
+function escapeChar(chr) {
+  return escape[chr];
+}
+
+function extend(obj /* , ...source */) {
+  for (var i = 1; i < arguments.length; i++) {
+    for (var key in arguments[i]) {
+      if (Object.prototype.hasOwnProperty.call(arguments[i], key)) {
+        obj[key] = arguments[i][key];
+      }
+    }
+  }
+
+  return obj;
+}
+
+var toString = Object.prototype.toString;
+
+exports.toString = toString;
+// Sourced from lodash
+// https://github.com/bestiejs/lodash/blob/master/LICENSE.txt
+/*eslint-disable func-style, no-var */
+var isFunction = function isFunction(value) {
+  return typeof value === 'function';
+};
+// fallback for older versions of Chrome and Safari
+/* istanbul ignore next */
+if (isFunction(/x/)) {
+  exports.isFunction = isFunction = function (value) {
+    return typeof value === 'function' && toString.call(value) === '[object Function]';
+  };
+}
+var isFunction;
+exports.isFunction = isFunction;
+/*eslint-enable func-style, no-var */
+
+/* istanbul ignore next */
+var isArray = Array.isArray || function (value) {
+  return value && typeof value === 'object' ? toString.call(value) === '[object Array]' : false;
+};exports.isArray = isArray;
+
+function indexOf(array, value) {
+  for (var i = 0, len = array.length; i < len; i++) {
+    if (array[i] === value) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function escapeExpression(string) {
+  if (typeof string !== 'string') {
+    // don't escape SafeStrings, since they're already safe
+    if (string && string.toHTML) {
+      return string.toHTML();
+    } else if (string == null) {
+      return '';
+    } else if (!string) {
+      return string + '';
+    }
+
+    // Force a string conversion as this will be done by the append regardless and
+    // the regex test will do this transparently behind the scenes, causing issues if
+    // an object's to string has escaped characters in it.
+    string = '' + string;
+  }
+
+  if (!possible.test(string)) {
+    return string;
+  }
+  return string.replace(badChars, escapeChar);
+}
+
+function isEmpty(value) {
+  if (!value && value !== 0) {
+    return true;
+  } else if (isArray(value) && value.length === 0) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+function blockParams(params, ids) {
+  params.path = ids;
+  return params;
+}
+
+function appendContextPath(contextPath, id) {
+  return (contextPath ? contextPath + '.' : '') + id;
+}
+},{}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/runtime.js":[function(require,module,exports){
+// Create a simple path alias to allow browserify to resolve
+// the runtime on a supported path.
+module.exports = require('./dist/cjs/handlebars.runtime')['default'];
+
+},{"./dist/cjs/handlebars.runtime":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/dist/cjs/handlebars.runtime.js"}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/hbsfy/runtime.js":[function(require,module,exports){
+module.exports = require("handlebars/runtime")["default"];
+
+},{"handlebars/runtime":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/handlebars/runtime.js"}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/whatwg-fetch/fetch.js":[function(require,module,exports){
+(function() {
+  'use strict';
+
+  if (self.fetch) {
+    return
+  }
+
+  function Headers(headers) {
+    this.map = {}
+
+    var self = this
+    if (headers instanceof Headers) {
+      headers.forEach(function(name, values) {
+        values.forEach(function(value) {
+          self.append(name, value)
+        })
+      })
+
+    } else if (headers) {
+      Object.getOwnPropertyNames(headers).forEach(function(name) {
+        self.append(name, headers[name])
+      })
+    }
+  }
+
+  Headers.prototype.append = function(name, value) {
+    name = name.toLowerCase()
+    var list = this.map[name]
+    if (!list) {
+      list = []
+      this.map[name] = list
+    }
+    list.push(value)
+  }
+
+  Headers.prototype['delete'] = function(name) {
+    delete this.map[name.toLowerCase()]
+  }
+
+  Headers.prototype.get = function(name) {
+    var values = this.map[name.toLowerCase()]
+    return values ? values[0] : null
+  }
+
+  Headers.prototype.getAll = function(name) {
+    return this.map[name.toLowerCase()] || []
+  }
+
+  Headers.prototype.has = function(name) {
+    return this.map.hasOwnProperty(name.toLowerCase())
+  }
+
+  Headers.prototype.set = function(name, value) {
+    this.map[name.toLowerCase()] = [value]
+  }
+
+  // Instead of iterable for now.
+  Headers.prototype.forEach = function(callback) {
+    var self = this
+    Object.getOwnPropertyNames(this.map).forEach(function(name) {
+      callback(name, self.map[name])
+    })
+  }
+
+  function consumed(body) {
+    if (body.bodyUsed) {
+      return Promise.reject(new TypeError('Already read'))
+    }
+    body.bodyUsed = true
+  }
+
+  function fileReaderReady(reader) {
+    return new Promise(function(resolve, reject) {
+      reader.onload = function() {
+        resolve(reader.result)
+      }
+      reader.onerror = function() {
+        reject(reader.error)
+      }
+    })
+  }
+
+  function readBlobAsArrayBuffer(blob) {
+    var reader = new FileReader()
+    reader.readAsArrayBuffer(blob)
+    return fileReaderReady(reader)
+  }
+
+  function readBlobAsText(blob) {
+    var reader = new FileReader()
+    reader.readAsText(blob)
+    return fileReaderReady(reader)
+  }
+
+  var support = {
+    blob: 'FileReader' in self && 'Blob' in self && (function() {
+      try {
+        new Blob();
+        return true
+      } catch(e) {
+        return false
+      }
+    })(),
+    formData: 'FormData' in self
+  }
+
+  function Body() {
+    this.bodyUsed = false
+
+    if (support.blob) {
+      this._initBody = function(body) {
+        this._bodyInit = body
+        if (typeof body === 'string') {
+          this._bodyText = body
+        } else if (support.blob && Blob.prototype.isPrototypeOf(body)) {
+          this._bodyBlob = body
+        } else if (support.formData && FormData.prototype.isPrototypeOf(body)) {
+          this._bodyFormData = body
+        } else if (!body) {
+          this._bodyText = ''
+        } else {
+          throw new Error('unsupported BodyInit type')
+        }
+      }
+
+      this.blob = function() {
+        var rejected = consumed(this)
+        if (rejected) {
+          return rejected
+        }
+
+        if (this._bodyBlob) {
+          return Promise.resolve(this._bodyBlob)
+        } else if (this._bodyFormData) {
+          throw new Error('could not read FormData body as blob')
+        } else {
+          return Promise.resolve(new Blob([this._bodyText]))
+        }
+      }
+
+      this.arrayBuffer = function() {
+        return this.blob().then(readBlobAsArrayBuffer)
+      }
+
+      this.text = function() {
+        var rejected = consumed(this)
+        if (rejected) {
+          return rejected
+        }
+
+        if (this._bodyBlob) {
+          return readBlobAsText(this._bodyBlob)
+        } else if (this._bodyFormData) {
+          throw new Error('could not read FormData body as text')
+        } else {
+          return Promise.resolve(this._bodyText)
+        }
+      }
+    } else {
+      this._initBody = function(body) {
+        this._bodyInit = body
+        if (typeof body === 'string') {
+          this._bodyText = body
+        } else if (support.formData && FormData.prototype.isPrototypeOf(body)) {
+          this._bodyFormData = body
+        } else if (!body) {
+          this._bodyText = ''
+        } else {
+          throw new Error('unsupported BodyInit type')
+        }
+      }
+
+      this.text = function() {
+        var rejected = consumed(this)
+        return rejected ? rejected : Promise.resolve(this._bodyText)
+      }
+    }
+
+    if (support.formData) {
+      this.formData = function() {
+        return this.text().then(decode)
+      }
+    }
+
+    this.json = function() {
+      return this.text().then(JSON.parse)
+    }
+
+    return this
+  }
+
+  // HTTP methods whose capitalization should be normalized
+  var methods = ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'POST', 'PUT']
+
+  function normalizeMethod(method) {
+    var upcased = method.toUpperCase()
+    return (methods.indexOf(upcased) > -1) ? upcased : method
+  }
+
+  function Request(url, options) {
+    options = options || {}
+    this.url = url
+
+    this.credentials = options.credentials || 'omit'
+    this.headers = new Headers(options.headers)
+    this.method = normalizeMethod(options.method || 'GET')
+    this.mode = options.mode || null
+    this.referrer = null
+
+    if ((this.method === 'GET' || this.method === 'HEAD') && options.body) {
+      throw new TypeError('Body not allowed for GET or HEAD requests')
+    }
+    this._initBody(options.body)
+  }
+
+  function decode(body) {
+    var form = new FormData()
+    body.trim().split('&').forEach(function(bytes) {
+      if (bytes) {
+        var split = bytes.split('=')
+        var name = split.shift().replace(/\+/g, ' ')
+        var value = split.join('=').replace(/\+/g, ' ')
+        form.append(decodeURIComponent(name), decodeURIComponent(value))
+      }
+    })
+    return form
+  }
+
+  function headers(xhr) {
+    var head = new Headers()
+    var pairs = xhr.getAllResponseHeaders().trim().split('\n')
+    pairs.forEach(function(header) {
+      var split = header.trim().split(':')
+      var key = split.shift().trim()
+      var value = split.join(':').trim()
+      head.append(key, value)
+    })
+    return head
+  }
+
+  Request.prototype.fetch = function() {
+    var self = this
+
+    return new Promise(function(resolve, reject) {
+      var xhr = new XMLHttpRequest()
+      if (self.credentials === 'cors') {
+        xhr.withCredentials = true;
+      }
+
+      function responseURL() {
+        if ('responseURL' in xhr) {
+          return xhr.responseURL
+        }
+
+        // Avoid security warnings on getResponseHeader when not allowed by CORS
+        if (/^X-Request-URL:/m.test(xhr.getAllResponseHeaders())) {
+          return xhr.getResponseHeader('X-Request-URL')
+        }
+
+        return;
+      }
+
+      xhr.onload = function() {
+        var status = (xhr.status === 1223) ? 204 : xhr.status
+        if (status < 100 || status > 599) {
+          reject(new TypeError('Network request failed'))
+          return
+        }
+        var options = {
+          status: status,
+          statusText: xhr.statusText,
+          headers: headers(xhr),
+          url: responseURL()
+        }
+        var body = 'response' in xhr ? xhr.response : xhr.responseText;
+        resolve(new Response(body, options))
+      }
+
+      xhr.onerror = function() {
+        reject(new TypeError('Network request failed'))
+      }
+
+      xhr.open(self.method, self.url, true)
+      if ('responseType' in xhr && support.blob) {
+        xhr.responseType = 'blob'
+      }
+
+      self.headers.forEach(function(name, values) {
+        values.forEach(function(value) {
+          xhr.setRequestHeader(name, value)
+        })
+      })
+
+      xhr.send(typeof self._bodyInit === 'undefined' ? null : self._bodyInit)
+    })
+  }
+
+  Body.call(Request.prototype)
+
+  function Response(bodyInit, options) {
+    if (!options) {
+      options = {}
+    }
+
+    this._initBody(bodyInit)
+    this.type = 'default'
+    this.url = null
+    this.status = options.status
+    this.statusText = options.statusText
+    this.headers = options.headers
+    this.url = options.url || ''
+  }
+
+  Body.call(Response.prototype)
+
+  self.Headers = Headers;
+  self.Request = Request;
+  self.Response = Response;
+
+  self.fetch = function (url, options) {
+    return new Request(url, options).fetch()
+  }
+  self.fetch.polyfill = true
+})();
+
+},{}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/src/js/page/flickr.js":[function(require,module,exports){
+var utils = require('./utils');
+
+var apiKey = '6d6610b7bb536b89a8f42d05ac1ad6ef';
+var apiUrl = 'https://api.flickr.com/services/rest/';
+
+function search(text, opts) {
+  var params = {
+    method: 'flickr.photos.search',
+    extras: 'description',
+    format: 'json',
+    api_key: apiKey,
+    text: text,
+    license: '4,5,6,7',
+    content_type: 1,
+    nojsoncallback: 1,
+    per_page: 10
+  };
+
+  return fetch(apiUrl + '?' + utils.toQuerystring(params), opts).then(function(response) {
+    return response.json();
+  }).then(function(response) {
+    if (response.stat == 'fail') {
+      throw Error(response.err.msg);
+    }
+
+    return response.photos.photo.sort(function(a, b) {
+      return b.id - a.id;
+    }).map(function(photo) {
+      return {
+        id: photo.id,
+        title: photo.title,
+        flickrUrl: 'https://www.flickr.com/photos/' + photo.owner + '/' + photo.id + '/',
+        imgUrl: 'https://farm' + photo.farm + '.staticflickr.com/' + photo.server + '/' + photo.id + '_' + photo.secret + '_c.jpg',
+        description: photo.description._content.trim()
+      };
+    });
+  });
+}
+
+module.exports.search = search;
+},{"./utils":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/src/js/page/utils.js"}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/src/js/page/utils.js":[function(require,module,exports){
+function defaults(opts, defaultOpts) {
+  var r = Object.create(defaultOpts);
+
+  if (!opts) { return r; }
+  
+  for (var key in opts) if (opts.hasOwnProperty(key)) {
+    r[key] = opts[key];
+  }
+
+  return r;
+}
+
+function toQuerystring(obj) {
+  var str = [];
+  for (var p in obj) {
+    if (obj.hasOwnProperty(p)) {
+      str.push(encodeURIComponent(p) + "=" + encodeURIComponent(obj[p]));
+    }
+  }
+  return str.join("&");
+}
+
+var strToEls = (function () {
+  var tmpEl = document.createElement('div');
+  return function (str) {
+    var r = document.createDocumentFragment();
+    tmpEl.innerHTML = str;
+    while (tmpEl.childNodes[0]) {
+      r.appendChild(tmpEl.childNodes[0]);
+    }
+    return r;
+  };
+}());
 
 
-},{"./exception":6,"./utils":9}],6:[function(require,module,exports){
-"use strict";function Exception(r,e){var o,t,s=e&&e.loc;s&&(o=s.start.line,t=s.start.column,r+=" - "+o+":"+t);for(var n=Error.prototype.constructor.call(this,r),i=0;i<errorProps.length;i++)this[errorProps[i]]=n[errorProps[i]];s&&(this.lineNumber=o,this.column=t)}var errorProps=["description","fileName","lineNumber","message","name","number","stack"];Exception.prototype=new Error,exports["default"]=Exception;
+module.exports = {
+  defaults: defaults,
+  toQuerystring: toQuerystring,
+  strToEls: strToEls
+};
+},{}],"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/src/js/page/views/photos.hbs":[function(require,module,exports){
+// hbsfy compiled Handlebars template
+var HandlebarsCompiler = require('hbsfy/runtime');
+module.exports = HandlebarsCompiler.template({"1":function(depth0,helpers,partials,data) {
+    var stack1, helper, alias1=helpers.helperMissing, alias2="function", alias3=this.escapeExpression;
 
+  return "  <article class=\"photo\">\n    <h1>\n      <a href=\""
+    + alias3(((helper = (helper = helpers.flickrUrl || (depth0 != null ? depth0.flickrUrl : depth0)) != null ? helper : alias1),(typeof helper === alias2 ? helper.call(depth0,{"name":"flickrUrl","hash":{},"data":data}) : helper)))
+    + "\">\n        <span class=\"main-photo\">\n          <span class=\"photo-fader\">\n            <img src=\""
+    + alias3(((helper = (helper = helpers.imgUrl || (depth0 != null ? depth0.imgUrl : depth0)) != null ? helper : alias1),(typeof helper === alias2 ? helper.call(depth0,{"name":"imgUrl","hash":{},"data":data}) : helper)))
+    + "\" alt=\"\" class=\"main-photo-img\">\n          </span>\n        </span>\n        <span class=\"title\">"
+    + alias3(((helper = (helper = helpers.title || (depth0 != null ? depth0.title : depth0)) != null ? helper : alias1),(typeof helper === alias2 ? helper.call(depth0,{"name":"title","hash":{},"data":data}) : helper)))
+    + "</span>\n      </a>\n    </h1>\n"
+    + ((stack1 = helpers['if'].call(depth0,(depth0 != null ? depth0.description : depth0),{"name":"if","hash":{},"fn":this.program(2, data, 0),"inverse":this.noop,"data":data})) != null ? stack1 : "")
+    + "  </article>\n";
+},"2":function(depth0,helpers,partials,data) {
+    var stack1, helper;
 
-},{}],7:[function(require,module,exports){
-"use strict";function checkRevision(e){var r=e&&e[0]||1,t=COMPILER_REVISION;if(r!==t){if(t>r){var n=REVISION_CHANGES[t],a=REVISION_CHANGES[r];throw new Exception("Template was precompiled with an older version of Handlebars than the current runtime. Please update your precompiler to a newer version ("+n+") or downgrade your runtime to an older version ("+a+").")}throw new Exception("Template was precompiled with a newer version of Handlebars than the current runtime. Please update your runtime to a newer version ("+e[1]+").")}}function template(e,r){if(!r)throw new Exception("No environment passed to template");if(!e||!e.main)throw new Exception("Unknown template object: "+typeof e);r.VM.checkRevision(e.compiler);var t=function(t,n,a){a.hash&&(n=Utils.extend({},n,a.hash)),t=r.VM.resolvePartial.call(this,t,n,a);var o=r.VM.invokePartial.call(this,t,n,a);if(null==o&&r.compile&&(a.partials[a.name]=r.compile(t,e.compilerOptions,r),o=a.partials[a.name](n,a)),null!=o){if(a.indent){for(var i=o.split("\n"),p=0,s=i.length;s>p&&(i[p]||p+1!==s);p++)i[p]=a.indent+i[p];o=i.join("\n")}return o}throw new Exception("The partial "+a.name+" could not be compiled when running in runtime-only mode")},n={strict:function(e,r){if(!(r in e))throw new Exception('"'+r+'" not defined in '+e);return e[r]},lookup:function(e,r){for(var t=e.length,n=0;t>n;n++)if(e[n]&&null!=e[n][r])return e[n][r]},lambda:function(e,r){return"function"==typeof e?e.call(r):e},escapeExpression:Utils.escapeExpression,invokePartial:t,fn:function(r){return e[r]},programs:[],program:function(e,r,t,n,a){var o=this.programs[e],i=this.fn(e);return r||a||n||t?o=program(this,e,i,r,t,n,a):o||(o=this.programs[e]=program(this,e,i)),o},data:function(e,r){for(;e&&r--;)e=e._parent;return e},merge:function(e,r){var t=e||r;return e&&r&&e!==r&&(t=Utils.extend({},r,e)),t},noop:r.VM.noop,compilerInfo:e.compiler},a=function(r,t){t=t||{};var o=t.data;a._setup(t),!t.partial&&e.useData&&(o=initData(r,o));var i,p=e.useBlockParams?[]:void 0;return e.useDepths&&(i=t.depths?[r].concat(t.depths):[r]),e.main.call(n,r,n.helpers,n.partials,o,p,i)};return a.isTop=!0,a._setup=function(t){t.partial?(n.helpers=t.helpers,n.partials=t.partials):(n.helpers=n.merge(t.helpers,r.helpers),e.usePartial&&(n.partials=n.merge(t.partials,r.partials)))},a._child=function(r,t,a,o){if(e.useBlockParams&&!a)throw new Exception("must pass block params");if(e.useDepths&&!o)throw new Exception("must pass parent depths");return program(n,r,e[r],t,0,a,o)},a}function program(e,r,t,n,a,o,i){var p=function(r,a){return a=a||{},t.call(e,r,e.helpers,e.partials,a.data||n,o&&[a.blockParams].concat(o),i&&[r].concat(i))};return p.program=r,p.depth=i?i.length:0,p.blockParams=a||0,p}function resolvePartial(e,r,t){return e?e.call||t.name||(t.name=e,e=t.partials[e]):e=t.partials[t.name],e}function invokePartial(e,r,t){if(t.partial=!0,void 0===e)throw new Exception("The partial "+t.name+" could not be found");return e instanceof Function?e(r,t):void 0}function noop(){return""}function initData(e,r){return r&&"root"in r||(r=r?createFrame(r):{},r.root=e),r}var Utils=require("./utils"),Exception=require("./exception")["default"],COMPILER_REVISION=require("./base").COMPILER_REVISION,REVISION_CHANGES=require("./base").REVISION_CHANGES,createFrame=require("./base").createFrame;exports.checkRevision=checkRevision,exports.template=template,exports.program=program,exports.resolvePartial=resolvePartial,exports.invokePartial=invokePartial,exports.noop=noop;
+  return "      <p class=\"description\">"
+    + ((stack1 = ((helper = (helper = helpers.description || (depth0 != null ? depth0.description : depth0)) != null ? helper : helpers.helperMissing),(typeof helper === "function" ? helper.call(depth0,{"name":"description","hash":{},"data":data}) : helper))) != null ? stack1 : "")
+    + "</p>\n";
+},"compiler":[6,">= 2.0.0-beta.1"],"main":function(depth0,helpers,partials,data) {
+    var stack1;
 
+  return ((stack1 = helpers.each.call(depth0,depth0,{"name":"each","hash":{},"fn":this.program(1, data, 0),"inverse":this.noop,"data":data})) != null ? stack1 : "");
+},"useData":true});
 
-},{"./base":5,"./exception":6,"./utils":9}],8:[function(require,module,exports){
-"use strict";function SafeString(t){this.string=t}SafeString.prototype.toString=SafeString.prototype.toHTML=function(){return""+this.string},exports["default"]=SafeString;
+},{"hbsfy/runtime":"/Users/corbettk/Google Drive/Workplace/trained-to-thrill/node_modules/hbsfy/runtime.js"}]},{},["./src/js/page/index.js"])
 
-
-},{}],9:[function(require,module,exports){
-"use strict";function escapeChar(t){return escape[t]}function extend(t){for(var r=1;r<arguments.length;r++)for(var n in arguments[r])Object.prototype.hasOwnProperty.call(arguments[r],n)&&(t[n]=arguments[r][n]);return t}function indexOf(t,r){for(var n=0,e=t.length;e>n;n++)if(t[n]===r)return n;return-1}function escapeExpression(t){if("string"!=typeof t){if(t&&t.toHTML)return t.toHTML();if(null==t)return"";if(!t)return t+"";t=""+t}return possible.test(t)?t.replace(badChars,escapeChar):t}function isEmpty(t){return t||0===t?isArray(t)&&0===t.length?!0:!1:!0}function blockParams(t,r){return t.path=r,t}function appendContextPath(t,r){return(t?t+".":"")+r}var escape={"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#x27;","`":"&#x60;"},badChars=/[&<>"'`]/g,possible=/[&<>"'`]/;exports.extend=extend;var toString=Object.prototype.toString;exports.toString=toString;var isFunction=function(t){return"function"==typeof t};isFunction(/x/)&&(isFunction=function(t){return"function"==typeof t&&"[object Function]"===toString.call(t)});var isFunction;exports.isFunction=isFunction;var isArray=Array.isArray||function(t){return t&&"object"==typeof t?"[object Array]"===toString.call(t):!1};exports.isArray=isArray,exports.indexOf=indexOf,exports.escapeExpression=escapeExpression,exports.isEmpty=isEmpty,exports.blockParams=blockParams,exports.appendContextPath=appendContextPath;
-
-
-},{}],10:[function(require,module,exports){
-module.exports=require("./dist/cjs/handlebars.runtime")["default"];
-
-
-},{"./dist/cjs/handlebars.runtime":4}],11:[function(require,module,exports){
-module.exports=require("handlebars/runtime")["default"];
-
-
-},{"handlebars/runtime":10}],12:[function(require,module,exports){
-!function(){"use strict";function t(e){this.map={};var o=this;e instanceof t?e.forEach(function(t,e){e.forEach(function(e){o.append(t,e)})}):e&&Object.getOwnPropertyNames(e).forEach(function(t){o.append(t,e[t])})}function e(t){return t.bodyUsed?Promise.reject(new TypeError("Already read")):void(t.bodyUsed=!0)}function o(t){return new Promise(function(e,o){t.onload=function(){e(t.result)},t.onerror=function(){o(t.error)}})}function r(t){var e=new FileReader;return e.readAsArrayBuffer(t),o(e)}function n(t){var e=new FileReader;return e.readAsText(t),o(e)}function s(){return this.bodyUsed=!1,d.blob?(this._initBody=function(t){if(this._bodyInit=t,"string"==typeof t)this._bodyText=t;else if(d.blob&&Blob.prototype.isPrototypeOf(t))this._bodyBlob=t;else if(d.formData&&FormData.prototype.isPrototypeOf(t))this._bodyFormData=t;else{if(t)throw new Error("unsupported BodyInit type");this._bodyText=""}},this.blob=function(){var t=e(this);if(t)return t;if(this._bodyBlob)return Promise.resolve(this._bodyBlob);if(this._bodyFormData)throw new Error("could not read FormData body as blob");return Promise.resolve(new Blob([this._bodyText]))},this.arrayBuffer=function(){return this.blob().then(r)},this.text=function(){var t=e(this);if(t)return t;if(this._bodyBlob)return n(this._bodyBlob);if(this._bodyFormData)throw new Error("could not read FormData body as text");return Promise.resolve(this._bodyText)}):(this._initBody=function(t){if(this._bodyInit=t,"string"==typeof t)this._bodyText=t;else if(d.formData&&FormData.prototype.isPrototypeOf(t))this._bodyFormData=t;else{if(t)throw new Error("unsupported BodyInit type");this._bodyText=""}},this.text=function(){var t=e(this);return t?t:Promise.resolve(this._bodyText)}),d.formData&&(this.formData=function(){return this.text().then(u)}),this.json=function(){return this.text().then(JSON.parse)},this}function i(t){var e=t.toUpperCase();return p.indexOf(e)>-1?e:t}function a(e,o){if(o=o||{},this.url=e,this.credentials=o.credentials||"omit",this.headers=new t(o.headers),this.method=i(o.method||"GET"),this.mode=o.mode||null,this.referrer=null,("GET"===this.method||"HEAD"===this.method)&&o.body)throw new TypeError("Body not allowed for GET or HEAD requests");this._initBody(o.body)}function u(t){var e=new FormData;return t.trim().split("&").forEach(function(t){if(t){var o=t.split("="),r=o.shift().replace(/\+/g," "),n=o.join("=").replace(/\+/g," ");e.append(decodeURIComponent(r),decodeURIComponent(n))}}),e}function f(e){var o=new t,r=e.getAllResponseHeaders().trim().split("\n");return r.forEach(function(t){var e=t.trim().split(":"),r=e.shift().trim(),n=e.join(":").trim();o.append(r,n)}),o}function h(t,e){e||(e={}),this._initBody(t),this.type="default",this.url=null,this.status=e.status,this.statusText=e.statusText,this.headers=e.headers,this.url=e.url||""}if(!self.fetch){t.prototype.append=function(t,e){t=t.toLowerCase();var o=this.map[t];o||(o=[],this.map[t]=o),o.push(e)},t.prototype["delete"]=function(t){delete this.map[t.toLowerCase()]},t.prototype.get=function(t){var e=this.map[t.toLowerCase()];return e?e[0]:null},t.prototype.getAll=function(t){return this.map[t.toLowerCase()]||[]},t.prototype.has=function(t){return this.map.hasOwnProperty(t.toLowerCase())},t.prototype.set=function(t,e){this.map[t.toLowerCase()]=[e]},t.prototype.forEach=function(t){var e=this;Object.getOwnPropertyNames(this.map).forEach(function(o){t(o,e.map[o])})};var d={blob:"FileReader"in self&&"Blob"in self&&function(){try{return new Blob,!0}catch(t){return!1}}(),formData:"FormData"in self},p=["DELETE","GET","HEAD","OPTIONS","POST","PUT"];a.prototype.fetch=function(){var t=this;return new Promise(function(e,o){function r(){return"responseURL"in n?n.responseURL:/^X-Request-URL:/m.test(n.getAllResponseHeaders())?n.getResponseHeader("X-Request-URL"):void 0}var n=new XMLHttpRequest;"cors"===t.credentials&&(n.withCredentials=!0),n.onload=function(){var t=1223===n.status?204:n.status;if(100>t||t>599)return void o(new TypeError("Network request failed"));var s={status:t,statusText:n.statusText,headers:f(n),url:r()},i="response"in n?n.response:n.responseText;e(new h(i,s))},n.onerror=function(){o(new TypeError("Network request failed"))},n.open(t.method,t.url,!0),"responseType"in n&&d.blob&&(n.responseType="blob"),t.headers.forEach(function(t,e){e.forEach(function(e){n.setRequestHeader(t,e)})}),n.send("undefined"==typeof t._bodyInit?null:t._bodyInit)})},s.call(a.prototype),s.call(h.prototype),self.Headers=t,self.Request=a,self.Response=h,self.fetch=function(t,e){return new a(t,e).fetch()},self.fetch.polyfill=!0}}();
-
-
-},{}],13:[function(require,module,exports){
-function search(t,r){var e={method:"flickr.photos.search",extras:"description",format:"json",api_key:apiKey,text:t,license:"4,5,6,7",content_type:1,nojsoncallback:1,per_page:10};return fetch(apiUrl+"?"+utils.toQuerystring(e),r).then(function(t){return t.json()}).then(function(t){if("fail"==t.stat)throw Error(t.err.msg);return t.photos.photo.sort(function(t,r){return r.id-t.id}).map(function(t){return{id:t.id,title:t.title,flickrUrl:"https://www.flickr.com/photos/"+t.owner+"/"+t.id+"/",imgUrl:"https://farm"+t.farm+".staticflickr.com/"+t.server+"/"+t.id+"_"+t.secret+"_c.jpg",description:t.description._content.trim()}})})}var utils=require("./utils"),apiKey="f2cca7d09b75c6cdea6864aca72e9895",apiUrl="https://api.flickr.com/services/rest/";module.exports.search=search;
-
-
-},{"./utils":14}],14:[function(require,module,exports){
-function defaults(r,e){var n=Object.create(e);if(!r)return n;for(var t in r)r.hasOwnProperty(t)&&(n[t]=r[t]);return n}function toQuerystring(r){var e=[];for(var n in r)r.hasOwnProperty(n)&&e.push(encodeURIComponent(n)+"="+encodeURIComponent(r[n]));return e.join("&")}var strToEls=function(){var r=document.createElement("div");return function(e){var n=document.createDocumentFragment();for(r.innerHTML=e;r.childNodes[0];)n.appendChild(r.childNodes[0]);return n}}();module.exports={defaults:defaults,toQuerystring:toQuerystring,strToEls:strToEls};
-
-
-},{}],15:[function(require,module,exports){
-var HandlebarsCompiler=require("hbsfy/runtime");module.exports=HandlebarsCompiler.template({1:function(n,a,l,e){var i,s,t=a.helperMissing,r="function",o=this.escapeExpression;return'  <article class="photo">\n    <h1>\n      <a href="'+o((s=null!=(s=a.flickrUrl||(null!=n?n.flickrUrl:n))?s:t,typeof s===r?s.call(n,{name:"flickrUrl",hash:{},data:e}):s))+'">\n        <span class="main-photo">\n          <span class="photo-fader">\n            <img src="'+o((s=null!=(s=a.imgUrl||(null!=n?n.imgUrl:n))?s:t,typeof s===r?s.call(n,{name:"imgUrl",hash:{},data:e}):s))+'" alt="" class="main-photo-img">\n          </span>\n        </span>\n        <span class="title">'+o((s=null!=(s=a.title||(null!=n?n.title:n))?s:t,typeof s===r?s.call(n,{name:"title",hash:{},data:e}):s))+"</span>\n      </a>\n    </h1>\n"+(null!=(i=a["if"].call(n,null!=n?n.description:n,{name:"if",hash:{},fn:this.program(2,e,0),inverse:this.noop,data:e}))?i:"")+"  </article>\n"},2:function(n,a,l,e){var i,s;return'      <p class="description">'+(null!=(s=null!=(s=a.description||(null!=n?n.description:n))?s:a.helperMissing,i="function"==typeof s?s.call(n,{name:"description",hash:{},data:e}):s)?i:"")+"</p>\n"},compiler:[6,">= 2.0.0-beta.1"],main:function(n,a,l,e){var i;return null!=(i=a.each.call(n,n,{name:"each",hash:{},fn:this.program(1,e,0),inverse:this.noop,data:e}))?i:""},useData:!0});
-
-
-},{"hbsfy/runtime":11}]},{},[1]);
 
 //# sourceMappingURL=page.js.map
