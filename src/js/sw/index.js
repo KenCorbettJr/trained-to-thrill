@@ -1,10 +1,15 @@
 require('serviceworker-cache-polyfill');
 
-var version = 'v15';
-var staticCacheName = 'danbo-static-v15';
+var version = 'v27';
+var staticCacheName = 'danbo-static-v27';
+var expectedCaches = [
+    staticCacheName,
+    'danbo-imgs',
+    'danbo-data'
+];
 
 self.addEventListener('install', function(event) {
-    self.skipWaiting();
+    self.skipWaiting();""
 
     event.waitUntil(
         caches.open(staticCacheName).then(function(cache) {
@@ -13,24 +18,18 @@ self.addEventListener('install', function(event) {
                 'css/all.css',
                 'js/page.js',
                 'imgs/logo.svg',
-                'imgs/icon.png'
+                'imgs/icon.png',
             ]);
         })
     );
-};
-
-var expectedCaches = [
-    staticCacheName,
-    'danbo-imgs',
-    'danbo-data'
-];
+});
 
 self.addEventListener('activate', function(event) {
     if (self.clients && clients.claim) {
         clients.claim();
     }
 
-    // remove caches beginning "trains-" that aren't in
+    // remove caches beginning "danbo-" that aren't in
     // expectedCaches
     event.waitUntil(
         caches.keys().then(function(cacheNames) {
@@ -43,35 +42,63 @@ self.addEventListener('activate', function(event) {
             );
         })
     );
-};
+});
 
 self.addEventListener('fetch', function(event) {
     var requestURL = new URL(event.request.url);
 
     if (requestURL.hostname == 'api.flickr.com') {
+        console.log("flikr data request");
         event.respondWith(flickrAPIResponse(event.request));
     }
     else if (/\.staticflickr\.com$/.test(requestURL.hostname)) {
+        console.log("flickr image request");
         event.respondWith(flickrImageResponse(event.request));
     }
     else {
+        console.log("other request for: ", requestURL.pathname);
         event.respondWith(
-            caches.match(event.request, {
-                ignoreVary: true
-            })
+            caches
+                // try and serve the request from the static cache
+                .match(event.request {
+                    cacheName: staticCacheName
+                })
+                // if it isn't in the static cache, just let the request go through
+                .catch(function(){
+                    return event.request
+                })
         );
+
+        // Try to update the static cache so that next time the response will be cached
+        updateStaticCacheForNextTime(event.request);
     }
-};
+});
 
 function getPhotoURL(photo) {
     return 'https://farm' + photo.farm + '.staticflickr.com/' + photo.server + '/' + photo.id + '_' + photo.secret + '_c.jpg';
 }
 
+function updateStaticCacheForNextTime(request) {
+    var cacheUpdateRequest = request.clone();
+    caches.match(cacheUpdateRequest, {
+            cacheName: staticCacheName
+        })
+        .then(function(cacheHit) {
+            if (cacheHit) {
+                caches.open(staticCacheName).then(function(cache) {
+                    fetch(cacheUpdateRequest).then(function (response) {
+                        cache.put(cacheUpdateRequest.url, response);
+                        console.log("updating cache for", cacheUpdateRequest.url);
+                    });
+                });
+            }
+        });
+}
+
 function flickrAPIResponse(request) {
     if (request.headers.get('x-use-cache-only')) {
         return caches.match(request);
-    }
-    else if (request.headers.get('x-cache-warmup')) {
+    } else if (request.headers.get('x-cache-warmup')) {
         var headers = new Headers(request.headers);
         headers.delete('x-cache-warmup');
         return flickrAPIResponse(new Request(request, {headers: headers})).then(function(response) {
@@ -84,8 +111,7 @@ function flickrAPIResponse(request) {
         }).then(function() {
             return caches.match(request);
         });
-    }
-    else {
+    } else {
         return fetch(request).then(function(response) {
             return caches.open('danbo-data').then(function(cache) {
                 // clean up the image cache
