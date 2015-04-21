@@ -1,6 +1,6 @@
 var utils = require('./utils');
 
-var apiKey = 'f2cca7d09b75c6cdea6864aca72e9895';
+var apiKey = '6d6610b7bb536b89a8f42d05ac1ad6ef';
 var apiUrl = 'https://api.flickr.com/services/rest/';
 
 function search(text, opts) {
